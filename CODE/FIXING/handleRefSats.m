@@ -45,64 +45,80 @@ Epoch.refSatQZS_idx = find(Epoch.sats == Epoch.refSatQZS);
 if newRefSat(1) || changeRefSat(1)
     sats_gps = Epoch.sats(Epoch.gps);
     elev_gps = elev(Epoch.gps);
-    % check if any possible reference satellites for GPS
-    if isempty(sats_gps) || all(isnan(elev_gps)) || all(Epoch.exclude(Epoch.gps))
+    if ~(isempty(sats_gps) || all(isnan(elev_gps)) || all(Epoch.exclude(Epoch.gps)))
+        % find suitable GPS reference satellite
+        if strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite')
+            Epoch.refSatGPS = chooseHighestRefSat(Epoch, sats_gps, elev_gps, Epoch.gps, settings, true);
+        elseif strcmp(settings.AMBFIX.refSatChoice, 'manual choice (list):')
+            Epoch.refSatGPS = chooseRefSatManual(settings.AMBFIX.refSatGPS', Epoch, Epoch.gps, elev_gps, settings, true);
+        end
+        if changeRefSat(1) && OldRefSat_G == Epoch.refSatGPS
+            % no better reference could be found
+            changeRefSat(1) = false;
+        end
+    else
+        % no possible reference satellites for GPS
         Epoch = resetRefSat(Epoch, 'GPS');
-        return
-    end
-    % finde suitable GPS reference satellite
-    if strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite')
-        Epoch.refSatGPS = chooseHighestRefSat(Epoch, sats_gps, elev_gps, Epoch.gps, settings, true);
-    elseif strcmp(settings.AMBFIX.refSatChoice, 'manual choice (list):')
-        Epoch.refSatGPS = chooseRefSatManual(settings.AMBFIX.refSatGPS', Epoch, Epoch.gps, elev_gps, settings, true);
     end
 end
 
 if newRefSat(2) || changeRefSat(2)
     sats_glo = Epoch.sats(Epoch.glo);
     elev_glo = elev(Epoch.glo);
-    % check if any possible reference satellites for GLO
-    if isempty(sats_glo) || all(isnan(elev_glo)) || all(Epoch.exclude(Epoch.glo))
+    if ~(isempty(sats_glo) || all(isnan(elev_glo)) || all(Epoch.exclude(Epoch.glo)))
+        % find suitable GLO reference satellite
+        if strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite')
+            Epoch.refSatGLO = chooseHighestRefSat(Epoch, sats_glo, elev_glo, Epoch.glo, settings, false);
+        elseif strcmp(settings.AMBFIX.refSatChoice, 'manual choice (list):')
+            Epoch.refSatGLO = chooseRefSatManual(settings.AMBFIX.refSatGLO', Epoch, Epoch.glo, elev_glo, settings, true);
+        end
+        if changeRefSat(2) && OldRefSat_R == Epoch.refSatGLO
+            % no better reference could be found
+            changeRefSat(2) = false;
+        end        
+    else
+        % no possible reference satellite for GLO
         Epoch = resetRefSat(Epoch, 'GLO');
-        return
-    end
-    % finde suitable GLO reference satellite
-    if strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite')
-        Epoch.refSatGLO = chooseHighestRefSat(Epoch, sats_glo, elev_glo, Epoch.glo, settings, false);
-    elseif strcmp(settings.AMBFIX.refSatChoice, 'manual choice (list):')
-        Epoch.refSatGLO = chooseRefSatManual(settings.AMBFIX.refSatGLO', Epoch, Epoch.glo, elev_glo, settings, true);
     end
 end
 
 if newRefSat(3) || changeRefSat(3)
     sats_gal = Epoch.sats(Epoch.gal);
     elev_gal = elev(Epoch.gal);
-    % check if any possible reference satellites for GAL
-    if isempty(sats_gal) || all(isnan(elev_gal)) || all(Epoch.exclude(Epoch.gal))
+    if ~(isempty(sats_gal) || all(isnan(elev_gal)) || all(Epoch.exclude(Epoch.gal)))
+        % find suitable GAL reference satellite
+        if strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite')
+            Epoch.refSatGAL = chooseHighestRefSat(Epoch, sats_gal, elev_gal, Epoch.gal, settings, true);
+        elseif strcmp(settings.AMBFIX.refSatChoice, 'manual choice (list):')
+            Epoch.refSatGAL = chooseRefSatManual(settings.AMBFIX.refSatGAL', Epoch, Epoch.gal, elev_gal, settings, true);
+        end
+        if changeRefSat(3) && OldRefSat_E == Epoch.refSatGAL
+            % no better reference could be found
+            changeRefSat(3) = false;
+        end           
+    else
+        % no possible reference satellite for GAL
         Epoch = resetRefSat(Epoch, 'GAL');
-        return
-    end
-    % finde suitable GAL reference satellite
-    if strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite')
-        Epoch.refSatGAL = chooseHighestRefSat(Epoch, sats_gal, elev_gal, Epoch.gal, settings, true);
-    elseif strcmp(settings.AMBFIX.refSatChoice, 'manual choice (list):')
-        Epoch.refSatGAL = chooseRefSatManual(settings.AMBFIX.refSatGAL', Epoch, Epoch.gal, elev_gal, settings, true);
     end
 end
 
 if newRefSat(4) || changeRefSat(4)
     sats_bds = Epoch.sats(Epoch.bds);
     elev_bds = elev(Epoch.bds);
-    % check if any possible reference satellites for BDS
-    if isempty(sats_bds) || all(isnan(elev_bds)) || all(Epoch.exclude(Epoch.bds))
+    if ~(isempty(sats_bds) || all(isnan(elev_bds)) || all(Epoch.exclude(Epoch.bds)))
+        % find suitable BDS reference satellite
+        if strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite')
+            Epoch.refSatBDS = chooseHighestRefSat(Epoch, sats_bds, elev_bds, Epoch.bds, settings, true);
+        elseif strcmp(settings.AMBFIX.refSatChoice, 'manual choice (list):')
+            Epoch.refSatBDS = chooseRefSatManual(settings.AMBFIX.refSatBDS', Epoch, Epoch.bds, elev_bds, settings, true);
+        end
+        if changeRefSat(4) && OldRefSat_C == Epoch.refSatBDS
+            % no better reference could be found
+            changeRefSat(4) = false;
+        end           
+    else
+        % no possible reference satellite for BDS
         Epoch = resetRefSat(Epoch, 'BDS');
-        return
-    end
-    % finde suitable BDS reference satellite
-    if strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite')
-        Epoch.refSatBDS = chooseHighestRefSat(Epoch, sats_bds, elev_bds, Epoch.bds, settings, true);
-    elseif strcmp(settings.AMBFIX.refSatChoice, 'manual choice (list):')
-        Epoch.refSatBDS = chooseRefSatManual(settings.AMBFIX.refSatBDS', Epoch, Epoch.bds, elev_bds, settings, true);
     end
 end
 
@@ -110,15 +126,19 @@ if newRefSat(5) || changeRefSat(5)
     sats_qzs = Epoch.sats(Epoch.qzss);
     elev_qzs = elev(Epoch.qzss);
     % check if any possible reference satellites for QZSS
-    if isempty(sats_qzs) || all(isnan(elev_qzs)) || all(Epoch.exclude(Epoch.qzss))
+    if ~(isempty(sats_qzs) || all(isnan(elev_qzs)) || all(Epoch.exclude(Epoch.qzss)))
+        % find suitable QZSS reference satellite
+        if strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite')
+            Epoch.refSatQZS = chooseHighestRefSat(Epoch, sats_qzs, elev_qzs, Epoch.qzss, settings, true);
+        elseif strcmp(settings.AMBFIX.refSatChoice, 'manual choice (list):')
+            Epoch.refSatQZS = chooseRefSatManual(settings.AMBFIX.refSatQZS', Epoch, Epoch.qzss, elev_qzs, settings, true);
+        end
+        if changeRefSat(5) && OldRefSat_J == Epoch.refSatQZS
+            % no better reference could be found
+            changeRefSat(5) = false;
+        end           
+    else
         Epoch = resetRefSat(Epoch, 'QZSS');
-        return
-    end
-    % finde suitable QZSS reference satellite
-    if strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite')
-        Epoch.refSatQZS = chooseHighestRefSat(Epoch, sats_qzs, elev_qzs, Epoch.qzss, settings, true);
-    elseif strcmp(settings.AMBFIX.refSatChoice, 'manual choice (list):')
-        Epoch.refSatQZS = chooseRefSatManual(settings.AMBFIX.refSatQZS', Epoch, Epoch.qzss, elev_qzs, settings, true);
     end
 end
 

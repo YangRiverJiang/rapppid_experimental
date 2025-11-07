@@ -153,6 +153,8 @@ end
 if strcmp(settings.IONO.model, 'GRAPHIC')
     A(code_row, :) = [];
     omc(code_row, :) = [];
+    % design matrix: replace 1 of ambiguities with 0.5
+    A(:,NO_PARAM+1:end) = A(:,NO_PARAM+1:end) / 2;    
 end
 
 

@@ -14,6 +14,7 @@ function iono = stec2iono(stec, f1, f2, f3)
 % This function belongs to raPPPid, Copyright (c) 2025, M.F. Wareyka-Glaner
 % *************************************************************************
 
+iono = zeros(1, 3);
 iono(1) = 40.3e16/f1^2 * stec;
 iono(2) = 40.3e16/f2^2 * stec;
 iono(3) = 40.3e16/f3^2 * stec;

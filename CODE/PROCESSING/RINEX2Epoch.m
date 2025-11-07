@@ -16,8 +16,9 @@ function [Epoch] = RINEX2Epoch(RINEX, epochheader, Epoch, n, ...
 %   Epoch       	struct, epoch-specific data for current epoch
 %   eof             boolean, true if end of file is reached
 %  
-%   Revision:
-%   	2023/11/03, MFWG: adding QZSS
+% Revision:
+%   2023/11/03, MFWG: adding QZSS
+%   2025/08/14, MFWG: switch to cal2gpstime
 % 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -54,16 +55,18 @@ lgth_epoch = length(data_epoch);  	% no. lines of current epoch
 if r_version == 2
     %% RINEX 2.x
     % --------- EPOCH HEADER ----------
-    % linvales = year (2-digit) | month | day | hour | min | sec | epoch flag |
+    % lvalues = year (2-digit) | month | day | hour | min | sec | epoch flag |
     %            string with satellites (e.g. 'G30G13G 2R 5E22J 7')
-    linvalues = textscan(epoch_header,'%f %f %f %f %f %f %d %2d%s','delimiter',',');
-    
-    % convert date into gps-time [sow]
-    h = linvalues{4} + linvalues{5}/60 + linvalues{6}/3600;             % fractional hour
-    jd = cal2jd_GT(2000+linvalues{1}, linvalues{2}, linvalues{3} + h/24); % julian date
-    mjd = jd-2400000.5;                                                 % modified Julian date
-    [gps_week, gps_time, ~] = jd2gps_GT(jd);                           	% gps-time [sow] and gps-week 
-        
+    lvalues = textscan(epoch_header,'%f %f %f %f %f %f %d %2d%s','delimiter',',');
+    Epoch.time = datetime(2000+lvalues{1}, lvalues{2}, lvalues{3}, lvalues{4}, lvalues{5}, lvalues{6}, ...
+        'Format', 'dd MMM yyyy HH:mm:ss.SSS');
+
+    % convert date into mjd and GPS time [sow]
+    h = lvalues{4} + lvalues{5}/60 + lvalues{6}/3600;               % fractional hour
+    jd = cal2jd_GT(2000+lvalues{1}, lvalues{2}, lvalues{3} + h/24); % julian date
+    mjd = jd - 2400000.5;                                           % modified Julian date
+    [gps_week, gps_time] = cal2gpstime([lvalues{1}, lvalues{2}, lvalues{3}, lvalues{4}, lvalues{5}, lvalues{6}]);
+
     % check if epoch is usable
     usable = true;
     if strcmp(epoch_header(29),'0') ~= 1 
@@ -71,9 +74,9 @@ if r_version == 2
     end
     
     % get number of observed satellites in current epoch
-    No_Sv = linvalues{8};
+    No_Sv = lvalues{8};
     
-    epoch_sats = linvalues{9}{1};       % only string with satellites
+    epoch_sats = lvalues{9}{1};       % only string with satellites
     if length(epoch_sats) > 36          % make sure only satellites are in string    
         epoch_sats = epoch_sats(1:36);        
     end
@@ -148,21 +151,22 @@ if r_version == 2
 elseif r_version == 3 || r_version == 4
     %% RINEX 3.x
     % --------- EPOCH HEADER ----------
-    % linvalues = year | month | day | hour | minute | second |
+    % lvalues = year | month | day | hour | minute | second |
     %             Epoch flag | number of observed satellites| empty |
     %             receiver clock offset
-    linvalues = textscan(epoch_header,'%*c %f %f %f %f %f %f %d %2d %f');
-    
-    % convert date into gps-time [sow]
-    h = linvalues{4} + linvalues{5}/60 + linvalues{6}/3600;             % fractional hour
-    jd = cal2jd_GT(linvalues{1}, linvalues{2}, linvalues{3} + h/24);    % Julian date
-    mjd = jd-2400000.5;                                                 % modified Julian date
-    [gps_week, gps_time,~] = jd2gps_GT(jd);                             % gps-time [sow] and gps-week 
-    gps_time = double(gps_time);     	
-    
+    lvalues = textscan(epoch_header,'%*c %f %f %f %f %f %f %d %2d %f');
+    Epoch.time = datetime(lvalues{1}, lvalues{2}, lvalues{3}, lvalues{4}, lvalues{5}, lvalues{6}, ...
+        'Format', 'dd MMM yyyy HH:mm:ss.SSS');
+
+    % convert date into mjd and GPS time [sow]
+    h = lvalues{4} + lvalues{5}/60 + lvalues{6}/3600;          	% fractional hour
+    jd = cal2jd_GT(lvalues{1}, lvalues{2}, lvalues{3} + h/24); 	% Julian date
+    mjd = jd - 2400000.5;                                     	% modified Julian date	
+    [gps_week, gps_time] = cal2gpstime([lvalues{1}, lvalues{2}, lvalues{3}, lvalues{4}, lvalues{5}, lvalues{6}]);
+
     % check if epoch is usable or number of satellites is zero
     usable = true;
-    if isempty(linvalues{7}) || isempty(linvalues{8}) || linvalues{7} ~= 0 || linvalues{8} == 0 || isempty(data_epoch)
+    if isempty(lvalues{7}) || isempty(lvalues{8}) || lvalues{7} ~= 0 || lvalues{8} == 0 || isempty(data_epoch)
         % Epoch header says that epoch flag is not zero/OK or number of 
         % satellites = 0 or no data 
         Epoch.gps_time = gps_time;
@@ -171,12 +175,12 @@ elseif r_version == 3 || r_version == 4
     end
     
     % get number of observed satellites
-    no_Obs = linvalues{8};          % number of observed satellites in current epoch
+    no_Obs = lvalues{8};          % number of observed satellites in current epoch
     
 %     % check for receiver clock offset
 %     rx_offset = 0;                              % receiver clock offset
-%     if ~isempty(linvalues{9})
-%         rx_offset = linvalues{9};
+%     if ~isempty(lvalues{9})
+%         rx_offset = lvalues{9};
 %     end    
         
     % no_obs:       vector, number of observation types for [GPS, Glonass, Galileo]
@@ -228,7 +232,7 @@ elseif r_version == 3 || r_version == 4
                 
                 % observation
                 obs_value = sscanf(lines(1:14), '%f');
-                if numel(obs_value) == 1 	% e.g. R103 (numel=2), checks also if empty (numel=0)
+                if isscalar(obs_value) 	% e.g. R103 (numel=2), checks also if empty (numel=0)
                     OBS(i_SV,j) = obs_value;
                 end
                 

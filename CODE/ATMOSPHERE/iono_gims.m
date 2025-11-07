@@ -58,6 +58,7 @@ end
 % used if method == 2: consecutive maps
 function vtec = method_consec_maps(Ttr, Lat_IPP, Lon_IPP, ionex)
 % Select time index, conversion from sow to index of the GIM depending on the interval of the Iono-Data
+time_index = [0 0];
 time_index(1) = round((Ttr-ionex.start_sow)/ ionex.interval)+1; % + 1 wegen Verspeicherung
 T0 = ionex.start_sow + (time_index(1)-1)*ionex.interval;
 if (Ttr - T0 > 0)       % Ttr soll zwischen T0 und T1 liegen: T0-Ttr-T1
@@ -115,6 +116,7 @@ elseif Ttr > ionex.end_sow
     Ttr = ionex.end_sow;    
 end
 % Select time index, conversion from sow to the intervall of the GIM
+time_index = [0 0];
 time_index(1) = round((Ttr-ionex.start_sow)/ ionex.interval)+1; % +1 wegen Verspeicherung
 T0 = ionex.start_sow + (time_index(1)-1)*ionex.interval;
 if Ttr - T0 > 0             % Ttr soll zwischen T0 und T1 liegen
@@ -201,6 +203,7 @@ longs = ionex_lon(1) : ionex_lon(3) : ionex_lon(2);
 lon_rasterpoint = longs(lon_ind);
 
 % Get the 4 TEC-Values to interpolate
+tecs = zeros(2);
 if (lat_ind == 1) || (lon_ind == size(gim,2))   % IPP is on the edge of GIM
     if (lat_ind == 1 && lon_ind == size(gim,2)) % Lat-Index too small and Long-Index too big
         tecs(2,1) = gim(lat_ind, lon_ind);          % lower-left-point

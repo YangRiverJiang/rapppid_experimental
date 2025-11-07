@@ -230,6 +230,20 @@ if strcmp(handles.uipanel_setInputFile.Visible, 'on')
             handles.text_qzss_time_offset_m.Enable = 'Off';
         end        
     end
+
+    % approximate position is not used for satellite PPP
+    if ~batch_proc && bool_satellite
+        set(handles.text_koord, 'Enable', 'Off');
+        set(handles.text_x, 'Enable', 'Off');
+        set(handles.text_y, 'Enable', 'Off');
+        set(handles.text_z, 'Enable', 'Off');
+        set(handles.edit_x, 'Enable', 'Off');
+        set(handles.edit_y, 'Enable', 'Off');
+        set(handles.edit_z, 'Enable', 'Off');
+        set(handles.text40, 'Enable', 'Off');
+        set(handles.text41, 'Enable', 'Off');
+        set(handles.text42, 'Enable', 'Off');
+    end
     
     % analyze RINEX is only possible if observation file is defined
     if strcmpi(handles.pushbutton_analyze_rinex.Enable, 'on')
@@ -341,7 +355,7 @@ if strcmpi(handles.uipanel_ionosphere.Visible, 'on')
     set(handles.buttongroup_models_ionosphere_autodetect,'Visible','Off');
     set(handles.buttongroup_models_ionosphere_ionex_type,'Visible','Off');
     switch iono_model
-        case {'2-Frequency-IF-LCs', '3-Frequency-IF-LC', 'Estimate', 'GRAPHIC', 'off'}
+        case {'2-Frequency-IF-LCs', '3-Frequency-IF-LC', 'Estimate', 'GRAPHIC', 'off', 'Estimate, decoupled clock'}
             set(handles.buttongroup_source_ionosphere,'Visible','Off');
             set(handles.buttongroup_models_ionosphere_ionex,'Visible','Off');
             set(handles.buttongroup_models_ionosphere_autodetect,'Visible','Off');
@@ -511,26 +525,45 @@ if strcmpi(handles.uipanel_otherCorrections.Visible, 'on')
     
     % Cycle-Slip Detection is not relevant for code only processing
     if contains(proc_meth, '+ Phase');   onoff = 'On';   else;   onoff = 'Off';   end
-    handles.text117.Enable = onoff;
-    handles.checkbox_CycleSlip_L1C1.Enable = onoff;
+    handles.text117.Enable = onoff;                         
+    handles.checkbox_CycleSlip_L1C1.Enable = onoff;         % code minus phase
     handles.text116.Enable = onoff;
-    handles.edit_CycleSlip_L1C1_threshold.Enable = onoff;
+    handles.edit_CycleSlip_L1C1_threshold.Enable = onoff;   
     handles.text115.Enable = onoff;
     handles.edit_CycleSlip_L1C1_window.Enable = onoff;
-    handles.checkbox_CycleSlip_DF.Enable = onoff;
+    handles.checkbox_CycleSlip_DF.Enable = onoff;           % dLi - dLj
     handles.text120.Enable = onoff;
     handles.edit_CycleSlip_DF_threshold.Enable = onoff;
-    handles.checkbox_CycleSlip_Doppler.Enable = onoff;
+    handles.checkbox_CycleSlip_Doppler.Enable = onoff;      % Doppler
     handles.text182.Enable = onoff;
     handles.edit_CycleSlip_Doppler_threshold.Enable = onoff;
     handles.checkbox_wind_up.Enable = onoff;
-    handles.checkbox_cs_td.Enable = onoff;
+    handles.checkbox_cs_td.Enable = onoff;          % time difference
     handles.text_cs_td_thresh.Enable = onoff;
     handles.edit_cs_td_thresh.Enable = onoff;
     handles.text_cs_td_degree.Enable = onoff;
     handles.edit_cs_td_degree.Enable = onoff;
-    handles.checkbox_LLI.Enable = onoff;
+    handles.checkbox_cs_HMW.Enable = onoff;         % HMW
+    handles.text_cs_HMW_thresh.Enable = onoff;
+    handles.edit_cs_HMW_thresh.Enable = onoff;
+    handles.text_cs_HMW_factor.Enable = onoff;
+    handles.edit_cs_HMW_factor.Enable = onoff;
+    handles.checkbox_LLI.Enable = onoff;            % LLI
     
+
+    % Multipath detection
+    onoff = 'Off';
+    if handles.checkbox_mp_detection.Value; onoff = 'On'; end
+    handles.text_mp_cooldown.Enable = onoff;
+    handles.edit_mp_cooldown.Enable = onoff;
+    handles.text_mp_thresh.Enable = onoff;
+    handles.edit_mp_thresh.Enable = onoff;
+    handles.text_mp_degree.Enable = onoff;
+    handles.edit_mp_degree.Enable = onoff;
+
+
+
+
     % ||| implement at some point
     
 end
@@ -672,11 +705,11 @@ if strcmpi(handles.uipanel_ambiguityFixing.Visible, 'on')
     
     % show fixing start depending on ionosphere processing model
     if bool_DCM
-        handles.text_start_WL.String = 'Start Fixing after                                seconds';
+        handles.text_start_WL.String = 'Start Fixing after [s]';
         handles.text_start_NL.Visible = 'Off';
         handles.edit_start_NL.Visible = 'Off';
     else
-        handles.text_start_WL.String = 'Start WL-Fixing after                        seconds';
+        handles.text_start_WL.String = 'Start WL-Fixing after [s]';
     end
     
     % do not show options of HMW Fixing for decoupled clock model
@@ -876,6 +909,8 @@ if strcmpi(handles.uipanel_adjustment.Visible, 'on')
     
     % Satellite PPP
     if bool_satellite
+		handles.text_sat_id.Visible    = 'On';
+		handles.edit_sat_id.Visible    = 'On';
         handles.text_sat_mass.Visible  = 'On';
         handles.edit_sat_mass.Visible  = 'On';
         handles.text_sat_area.Visible  = 'On';
@@ -883,8 +918,11 @@ if strcmpi(handles.uipanel_adjustment.Visible, 'on')
         handles.text_sat_drag.Visible  = 'On';
         handles.edit_sat_drag.Visible  = 'On'; 
         handles.text_sat_solar.Visible = 'On';
-        handles.edit_sat_solar.Visible = 'On';        
+        handles.edit_sat_solar.Visible = 'On'; 
+        handles.uibuttongroup_orientation_mode.Visible = 'On';
     else
+		handles.text_sat_id.Visible    = 'Off';
+		handles.edit_sat_id.Visible    = 'Off';	
         handles.text_sat_mass.Visible  = 'Off';
         handles.edit_sat_mass.Visible  = 'Off';
         handles.text_sat_area.Visible  = 'Off';
@@ -893,6 +931,7 @@ if strcmpi(handles.uipanel_adjustment.Visible, 'on')
         handles.edit_sat_drag.Visible  = 'Off'; 
         handles.text_sat_solar.Visible = 'Off';
         handles.edit_sat_solar.Visible = 'Off';   
+        handles.uibuttongroup_orientation_mode.Visible = 'Off';
     end
 
 end
@@ -1054,15 +1093,7 @@ end
 
 %% Export Options
 if strcmpi(handles.uipanel_export.Visible, 'on')
-    
-    % Output
-    if handles.checkbox_fixing.Value
-        handles.checkbox_exp_results_fixed.Enable = 'on';
-    else
-        handles.checkbox_exp_results_fixed.Enable = 'off';
-    end
-    
-    
+        
     % Variables - storeData
     if handles.checkbox_exp_storeData.Value
         handles.checkbox_exp_storeData_vtec.Enable    = 'on';

@@ -98,6 +98,11 @@ if settings.INPUT.use_GAL
     A_N_SD(idx_N2(Epoch.gal), Epoch.refSatGAL_idx +   no_sats) = 1;
     A_N_SD(idx_N3(Epoch.gal), Epoch.refSatGAL_idx + 2*no_sats) = 1;
 end
+if settings.INPUT.use_BDS
+    A_N_SD(idx_N1(Epoch.bds), Epoch.refSatBDS_idx) = 1;
+    A_N_SD(idx_N2(Epoch.bds), Epoch.refSatBDS_idx +   no_sats) = 1;
+    A_N_SD(idx_N3(Epoch.bds), Epoch.refSatBDS_idx + 2*no_sats) = 1;
+end
 % add parts for [coordinates, ambiguities, ionospheric delay] to Design
 % Matrix, build and remove unfixed ambiguities
 A_xyz_add = zeros(3*no_sats,3);            
@@ -107,7 +112,7 @@ A_fix = [A_float; A_add];
 
 % Generate P-Matrix with high weights of fixed ambiguity pseudo-observations
 % ||| 1st frequency is taken and copied for 2nd (and 3rd) frequency
-P_diag = createWeights(Epoch, elev, settings);
+P_diag = createWeights(Epoch, elev, settings, []);
 P = diag(1./P_diag(:,1))*1000^2;        	% 1000 seems to be a good choice
 P_add = blkdiag(P, P, P);
 P_add = P_add(bool_N, bool_N);          % remove rows+columns of unfixed ambiguities
@@ -131,7 +136,8 @@ Adjust.res_fix(:,2) = codephase((1 + 2*no_sats) : (4*no_sats));
 Adjust.res_fix(:,3) = codephase((1 + 4*no_sats) : (6*no_sats));
 
 % calculates coordinates from fixed adjustment
-Adjust.param_fix = Adjust.param(1:3) + dx.x(1:3);
+Adjust.param_fix = zeros(NO_PARAM,1);
+Adjust.param_fix(1:3) = Adjust.param(1:3) + dx.x(1:3);
 Adjust.fixed = true;
 
 % save ionosphere estimation from fixed adjustment

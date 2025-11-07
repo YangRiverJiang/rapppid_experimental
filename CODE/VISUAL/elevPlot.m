@@ -61,7 +61,7 @@ if isGPS
 end
 if isGLO
     subplot(no_rows, no_cols, i_plot)
-    plotElev(el(:,idx_R)', elev_mask, DEF.SATS_GLO, 'Glonass', label_x, hours)
+    plotElev(el(:,idx_R)', elev_mask, DEF.SATS_GLO, 'GLONASS', label_x, hours)
     i_plot = i_plot + 1;
 end
 if isGAL

@@ -1,4 +1,4 @@
-function [sat_p, sat_v] = SatPos_brdc(t, eph, GM, we_dot)
+function [sat_p, sat_v, dT_rel] = SatPos_brdc(t, eph, GM, we_dot)
 % Calculation of Satellite Position and velocity (ECEF) at time t
 % for given navigation ephemeris eph. Additional input variables are the 
 % Earth universal gravitational constant GM and rotation rate we_dot as 
@@ -15,6 +15,7 @@ function [sat_p, sat_v] = SatPos_brdc(t, eph, GM, we_dot)
 % OUTPUT:
 %   sat_p       satellite position in ECEF [m]
 %   sat_v       satellite velocity in ECEF [m/s]
+%   dT_rel      relativistic correction, calculated from nav message [s]
 % 
 % Revision:
 %   2025/02/24, MFWG: change of input variables
@@ -22,6 +23,7 @@ function [sat_p, sat_v] = SatPos_brdc(t, eph, GM, we_dot)
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
+sat_p = [0; 0; 0]; sat_v = [0; 0; 0];
 
 % Get variables for calculating satellite position from eph, units are 
 % either [second], [meter] or [radian]
@@ -102,7 +104,6 @@ sat_v(2,1) = sin(Omega)*dot_x1 + cos(i)*cos(Omega)*dot_y1 + x1*cos(Omega)*dot_om
 sat_v(3,1) = sin(i)    *dot_y1  + y1*cos(i)*dot_i;
 
 
-% % alternative way to calculate relativistic correction [s] according to 
-% % GPS ICD 20.3.3.3.3.1
-% F = - 4.442807633 * 1e-10;   % [ s / sqrt(m) ]
-% dT_rel =  F * ecc * roota  * sin(E);      % relativistic correction [s]
+% calculate relativistic correction [s] according to GPS ICD 20.3.3.3.3.1
+F = -2 * sqrt(GM) / Const.C^2;           % [ s / sqrt(m) ]
+dT_rel =  F * ecc * roota  * sin(E);     % relativistic correction [s]

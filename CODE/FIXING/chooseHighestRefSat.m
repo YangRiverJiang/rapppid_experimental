@@ -11,6 +11,10 @@ function refSat = chooseHighestRefSat(Epoch, sats_gnss, elev_gnss, gnss, setting
 % OUTPUT:
 %   refSat          selected reference satellite
 %
+% Revision:
+%   2025/09/13, MFWG: check for full set of observations instead of
+%                     preferring 3-frequency satellites
+% 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
@@ -38,18 +42,16 @@ if settings.AMBFIX.bool_AMBFIX          % check if integer ambiguity fixing is e
     
     if bool_fixable
         % reduce elevation of satellites which are not fixable
-        unfixable = ~Epoch.fixable(gnss);
+        unfixable = any(~Epoch.fixable(gnss, :), 2);
         elev_gnss(unfixable) = elev_gnss(unfixable) - 90;
     end
 end
 
-
-if settings.INPUT.num_freqs >= 3
-    % preferre three frequency-satellites (e.g., GPS L5) to facilitate fixing
-    bool_3fr = gnss & ~isnan(Epoch.C1) & ~isnan(Epoch.C2) & ~isnan(Epoch.C3);
-    bool_3fr = bool_3fr(gnss) & (elev_gnss > settings.AMBFIX.cutoff);
-    elev_gnss(bool_3fr) = elev_gnss(bool_3fr) + 180;
-end
+% prefere satellites with a full set of observations -> three frequency
+% satellites are prefered
+bool_all = check_all_obs(Epoch, settings.INPUT.n_gnss_freqs, settings.INPUT.use_GPS, settings.INPUT.use_GLO, settings.INPUT.use_GAL, settings.INPUT.use_BDS, settings.INPUT.use_QZSS);
+missing_obs = ~bool_all(gnss);
+elev_gnss = elev_gnss - 180 * missing_obs;
 
 
 

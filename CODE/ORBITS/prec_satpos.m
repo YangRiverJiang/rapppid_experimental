@@ -28,7 +28,7 @@ function [X, V, cutoff, status] = prec_satpos(precEph, prn, sv, Ttr, cutoff, sta
 % check if interpolation is possible at all
 if all(precEph.t(:,sv) == 0)     % no precise ephemeris data for this satellite at all
 %     if bool_print
-%         fprintf('\nNo precise orbit data for satellite %d in SOW %.3f              \n', prn, Ttr);
+%         fprintf('\nNo precise orbit data for satellite %.0f in SOW %.3f              \n', prn, Ttr);
 %     end
     X = NaN(3,1); V = NaN(3,1);
     cutoff = true;
@@ -72,7 +72,7 @@ Z_ipol = precEph.Z(epochs,sv);
 if isempty(epochs) || any((X_ipol == 0) | (Y_ipol == 0) | (Z_ipol == 0))
     % interpolation is not possible (one zero makes degree 12 impossible)
     if bool_print
-        fprintf('\nNo precise orbit data for satellite %d in SOW %.3f              \n', prn, Ttr);
+        fprintf('\nNo precise orbit data for satellite %.0f in SOW %.3f              \n', prn, Ttr);
     end
     X = NaN(3,1); V = NaN(3,1);
     cutoff = true;
@@ -85,7 +85,8 @@ end
 if ~isfield(precEph,'t_vel')
     % no velocity information, interpolate velocity from positions
     dt_ = 0.001;     % [s]
-    [X_prev(1),X_prev(2),X_prev(3)] = poly_interp11(Ttr-dt_, T_ipol, X_ipol, Y_ipol, Z_ipol );
+    [x_prev, y_prev, z_prev] = poly_interp11(Ttr-dt_, T_ipol, X_ipol, Y_ipol, Z_ipol);
+    X_prev = [x_prev, y_prev, z_prev];
     V = (X - X_prev')/dt_;
 else
     [V(1),V(2),V(3)] = poly_interp11(Ttr, precEph.t_vel(epochs,sv), precEph.X_vel(epochs,sv), precEph.Y_vel(epochs,sv), precEph.Z_vel(epochs,sv) );

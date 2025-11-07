@@ -11,8 +11,8 @@ function [PROC_epochs] = sod2epochs(RINEX, epochheader, PROC_epochs, version)
 % OUTPUT:
 %   PROC_epochs     start and end epoch of processing [number of epoch]
 %
-%   Revision:
-%   ...
+% Revision:
+%   2025/08/14, MFWG: switch to cal2gpstime
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -27,18 +27,16 @@ for i = 1:no_headers
     if version == 2                         % RINEX-file is version 2
         % linvales = year (2-digit) | month | day | hour | min | sec | epoch flag |
         %            string with satellites (e.g. 'G30G13G 2R 5E22J 7')
-        linvalues = textscan(headers{i},'%f %f %f %f %f %f %d %2d%s','delimiter',',');
-        linvalues{1} = linvalues{1} + 2000;
+        lvalues = textscan(headers{i},'%f %f %f %f %f %f %d %2d%s','delimiter',',');
+        lvalues{1} = lvalues{1} + 2000;
     elseif version == 3 || version == 4 	% RINEX-file is version 3 or 4
         % linvalues = year | month | day | hour | minute | second |
         %             Epoch flag | number of observed satellites| empty |
         %             receiver clock offset
-        linvalues = textscan(headers{i},'%*c %f %f %f %f %f %f %d %2d %f');
+        lvalues = textscan(headers{i},'%*c %f %f %f %f %f %f %d %2d %f');
     end
     % convert date into gps-time [sow]
-    h = linvalues{4} + linvalues{5}/60 + linvalues{6}/3600;             % fractional jour
-    jd = cal2jd_GT(linvalues{1}, linvalues{2}, linvalues{3} + h/24);     % julian date
-    [~,time_epochs(i),~] = jd2gps_GT(jd);           % gps-time [sow]
+    [~, time_epochs(i)] = cal2gpstime([lvalues{1}, lvalues{2}, lvalues{3}, lvalues{4}, lvalues{5}, lvalues{6}]);
 end
 
 

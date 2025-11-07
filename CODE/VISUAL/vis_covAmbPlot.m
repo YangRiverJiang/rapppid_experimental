@@ -1,5 +1,5 @@
 function vis_covAmbPlot(hours, STD, s0_amb, label_x, rgb, observ, isGPS, isGLO, isGAL, isBDS, isQZSS)
-% creates Covariance Plot of the Ambiguities
+% Creates Covariance Plot of the Ambiguities
 %
 % INPUT:
 %   hours       vector, time [h] from beginning of processing
@@ -74,7 +74,7 @@ for j = 1:no_frqs
         ylim([0 y_max])
         xlim(x_limits)
         % create legend (otherwise datatip is not working)
-        hleg = legend(strcat('R', sprintfc('%02.0f', glo_prns)));
+        hleg = legend(strcat('R', sprintfc('%02.0f', mod(glo_prns,100))));
         title(hleg, 'PRN')          % title for legend
         legend off
     end
@@ -91,7 +91,7 @@ for j = 1:no_frqs
         ylim([0 y_max])
         xlim(x_limits)
         % create legend (otherwise datatip is not working)
-        hleg = legend(strcat('E', sprintfc('%02.0f', gal_prns)));
+        hleg = legend(strcat('E', sprintfc('%02.0f', mod(gal_prns,100))));
         title(hleg, 'PRN')          % title for legend
         legend off
     end
@@ -108,7 +108,7 @@ for j = 1:no_frqs
         ylim([0 y_max])
         xlim(x_limits)
         % create legend (otherwise datatip is not working)
-        hleg = legend(strcat('C', sprintfc('%02.0f', bds_prns)));
+        hleg = legend(strcat('C', sprintfc('%02.0f', mod(bds_prns,100))));
         title(hleg, 'PRN')          % title for legend
         legend off
     end
@@ -125,7 +125,7 @@ for j = 1:no_frqs
         ylim([0 y_max])
         xlim(x_limits)
         % create legend (otherwise datatip is not working)
-        hleg = legend(strcat('C', sprintfc('%02.0f', qzss_prns)));
+        hleg = legend(strcat('C', sprintfc('%02.0f', mod(qzss_prns,100))));
         title(hleg, 'PRN')          % title for legend
         legend off
     end    

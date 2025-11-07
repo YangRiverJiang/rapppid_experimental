@@ -27,6 +27,7 @@ function vis_plotSatConstellation(h, epochs, strXAxis, satellites, cutoff, isGPS
 observ_sats = logical(full(satellites.obs));
 cutoff = full(cutoff);
 cutoff(isnan(cutoff)) = 0;
+plot_GPS_L5 = isGPS && ~isGLO && ~isGAL && ~isBDS && ~isQZS;
 
 eps = numel(epochs);
 prn_obs = ones(eps,1) * [1:410];        % [] are important
@@ -67,7 +68,7 @@ UsedGLO = noAllGLO-notUsedGLO;
 UsedGAL = noAllGAL-notUsedGAL;
 UsedBDS = noAllBDS-notUsedBDS;
 UsedQZS = noAllQZS-notUsedQZS;
-UsedGNSS = notUsedGPS + notUsedGLO + notUsedGAL + notUsedBDS + notUsedQZS;
+notUsedGNSS = notUsedGPS + notUsedGLO + notUsedGAL + notUsedBDS + notUsedQZS;
 
 fig_sat_vis = figure('Name','Satellite Visibility Plot', 'NumberTitle','off');
 
@@ -128,7 +129,7 @@ if isGPS
     plot(h, UsedGPS,  '.', 'Color',DEF.COLOR_G)
     legend_txt{end+1} = 'GPS visible';
     legend_txt{end+1} = 'GPS used';
-    if ~isGLO && ~isGAL && ~isBDS && ~isQZS      % plot number of GPS L5 satellites
+    if plot_GPS_L5          % plot number of GPS L5 satellites
         noGPS_L5 = sum(observ_sats(:, DEF.PRNS_GPS_L5),2,'omitnan');
         notUsed_L5 = sum( cutoff(:, DEF.PRNS_GPS_L5),2,'omitnan');
         UsedGPS_L5 = noGPS_L5-notUsed_L5;
@@ -181,7 +182,7 @@ hold on
 if isGPS
     plot(h, sv_GPS+0.1,   '.', 'Color', DEF.COLOR_G);
     plot(h, sv_GPS_cutoff+0.1, '.', 'Color',[0.8 0.8 0.8]);
-    if ~isGLO && ~isGAL && ~isBDS       % plot number of GPS L5 satellites
+    if plot_GPS_L5              % plot number of GPS L5 satellites
         bool_L5 = false(1,DEF.SATS_GPS);
         bool_L5(DEF.PRNS_GPS_L5) = true;
         sv_GPS(:,~bool_L5) = 0;
@@ -231,7 +232,7 @@ if isGPS
     % plot lines (better visible)
     histogram(UsedGPS, edges, 'Normalization','probability', 'FaceAlpha', 0.3, 'EdgeColor', DEF.COLOR_G, 'DisplayStyle', 'stairs')
     lg_txt{end+1} = 'GPS';
-    if ~isGLO && ~isGAL && ~isBDS       % plot number of GPS L5 satellites
+    if plot_GPS_L5              % plot number of GPS L5 satellites
         % histogram(UsedGPS_L5, edges, 'Normalization','probability', 'FaceAlpha', 0.3, 'FaceColor',[1 .65 0])
         histogram(UsedGPS_L5, edges, 'Normalization','probability', 'FaceAlpha', 0.3, 'EdgeColor', [1 .65 0], 'DisplayStyle', 'stairs')
         lg_txt{end+1} = 'GPS L5';

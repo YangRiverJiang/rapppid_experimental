@@ -16,8 +16,8 @@ function ion = read_ion(file_ion)
 % 	... .sin_TEC      	b_nm coefficients for sine-term
 % 	... .sin_RMS    	RMS of b_nm coeffs
 %
-%   Revision:
-%   ...
+% Revision:
+%   2025/08/14, MFWG: switch to cal2gpstime
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -63,9 +63,8 @@ while l <= numel(ION)       	% loop over lines
     if contains(line,'PERIOD OF VALIDITY')
         line = ION{l};      l = l + 1;
         line = line(1,50:68);
-        date = sscanf(line,'%f');                               % format = date, is converted to sow
-        jd = cal2jd_GT(date(1), date(2), date(3) + date(4)/24 + date(5)/1440 + date(6)/86400);
-        [~, sow, ~] = jd2gps_GT(jd);
+        date = sscanf(line,'%f');       % format = calendar date, convert to sow
+        [~, sow] = cal2gpstime(date');
         ion.t(map_idx) = sow;
     end
     if contains(line,'COEFFICIENTS')            % start of coefficients

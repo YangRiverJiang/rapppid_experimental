@@ -46,7 +46,7 @@ if settings.INPUT.use_GLO
     prns_GLO = 1:DEF.SATS_GLO;
     prns_GLO = prns_GLO(idx);
     settings.PROC.exclude_sats = [settings.PROC.exclude_sats; 100+prns_GLO'];
-    if bool_print; printInfo(prns_GLO, 'Glonass'); end
+    if bool_print; printInfo(prns_GLO, 'GLONASS'); end
 end
 
 % Galileo

@@ -32,6 +32,10 @@ function [] = DownloadHourly01sIGS(stations, hours, doys, year, host)
 % ||| Somehow the cddis download does not work inside the GEO-IT on H: and U:
 
 
+% ||| https://igs.bkg.bund.de/root_ftp/IGS/highrate/
+% ||| https://igs.bkg.bund.de/root_ftp/EUREF/highrate/
+
+
 %% Prepare
 if nargin == 4
     % if host is not defined as input variable try do download from all

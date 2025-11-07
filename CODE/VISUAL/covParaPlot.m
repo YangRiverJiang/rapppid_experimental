@@ -1,10 +1,12 @@
-function covParaPlot(hours, std_param, label_xAxis, settings)
-% creates covariance plot of estimated parameters
+function covParaPlot(hours, std_param, label_xAxis, NO_PARAM, ORDER, settings)
+% Creates a covariance plot of estimated parameters.
 %
 % INPUT:
 %   hours           vector, hours of epoch since beginning of processing
 %   std_param       standard deviation for all parameters and epochs
 %   label_xAxis     string, label for the x-Axis
+%   NO_PARAM        number of parameters estimated during processing
+%   ORDER           order of parameters
 %   settings        struct, processing settings from GUI
 % OUTPUT:
 %   []
@@ -12,6 +14,7 @@ function covParaPlot(hours, std_param, label_xAxis, settings)
 % Revision:
 %   2023/06/11, MFWG: adding QZSS
 %   2024/02/02, MFWG: adaptations for DCM
+%   2025/08/08, MFWG: dehardcode read-out of std of parameters
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -36,7 +39,6 @@ remove = all(std_param == 1,2);
 std_param(remove,:) = NaN;
 
 % determine the number of subplots
-NO_PARAM = size(std_param, 1);      % number of parameters
 n = 1 + (NO_PARAM ~= 4) + estimate_dcbs;
 
 % create figure
@@ -47,13 +49,19 @@ m2ns = 1e9 / Const.C;           % to convert from [m] to [ns]
     
 
 %% Coordinates and ZWD
-% plot
+% create plot
 subplot(n,1,1);
 hold on
-h1 = plot(hours, std_param(1,:), 'r-');          % X
-h2 = plot(hours, std_param(2,:), 'b-');          % Y
-h3 = plot(hours, std_param(3,:), 'g-');          % Z
-h4 = plot(hours, std_param(4,:), 'k-');          % wet tropospheric delay
+% get standard deviation of coordinates and ZWD
+X = get_std(std_param, ORDER, 'x');
+Y = get_std(std_param, ORDER, 'y');
+Z = get_std(std_param, ORDER, 'z');
+ZWD = get_std(std_param, ORDER, 'zwd');
+% plot standard deviation of coordinates and ZWD 
+h1 = plot(hours, X, 'r-');              % X
+h2 = plot(hours, Y, 'b-');              % Y
+h3 = plot(hours, Z, 'g-');              % Z
+h4 = plot(hours, ZWD, 'k-');            % zenith wet tropospheric delay
 % style
 hleg = legend([h1,h2,h3,h4],{'X', 'Y', 'Z', 'ZWD'}, 'Location', 'NorthEast');
 title(hleg, 'Parameter [m]');
@@ -72,10 +80,10 @@ if NO_PARAM ~= 4 && ~DecoupledClockModel
     leg_txt_clk = {}; i = 1;
     hold on
     % get estimated receiver clock errors for all GNSS
-    GPS_rec_clk_code = std_param(05,:);     % [m]
-    GLO_rec_clk_code = std_param(08,:);
-    GAL_rec_clk_code = std_param(11,:);
-    BDS_rec_clk_code = std_param(14,:);
+    GPS_rec_clk_code = get_std(std_param, ORDER, 'rec_clk_G');     % [m]
+    GLO_rec_clk_code = get_std(std_param, ORDER, 'rec_clk_R');
+    GAL_rec_clk_code = get_std(std_param, ORDER, 'rec_clk_E');
+    BDS_rec_clk_code = get_std(std_param, ORDER, 'rec_clk_C');
     if any(~isnan(GPS_rec_clk_code)) && isGPS
         plot(hours, GPS_rec_clk_code, 'r-');
         leg_txt_clk{i} = 'dt_{rec}^{G}'; i=i+1;
@@ -93,7 +101,7 @@ if NO_PARAM ~= 4 && ~DecoupledClockModel
         leg_txt_clk{i} = 'dt_{rec}^{C}';
     end
     if isQZSS
-        QZS_rec_clk_code = std_param(17,:);
+        QZS_rec_clk_code = get_std(std_param, ORDER, 'rec_clk_J');
         if any(~isnan(QZS_rec_clk_code))
             plot(hours, QZS_rec_clk_code, 'g-');
             leg_txt_clk{i} = 'dt_{rec}^{J}';
@@ -116,17 +124,17 @@ elseif DecoupledClockModel
     leg_txt_clk = {}; i = 1;
     hold on
     % get estimated code receiver clock errors for all GNSS
-    GPS_rec_clk_code = std_param(05,:);     % [m]
-    GLO_rec_clk_code = std_param(06,:);
-    GAL_rec_clk_code = std_param(07,:);
-    BDS_rec_clk_code = std_param(08,:);
-    QZS_rec_clk_code = std_param(09,:);
+    GPS_rec_clk_code = get_std(std_param, ORDER, 'rec_clk_code_G');    % [m]
+    GLO_rec_clk_code = get_std(std_param, ORDER, 'rec_clk_code_R');
+    GAL_rec_clk_code = get_std(std_param, ORDER, 'rec_clk_code_E');
+    BDS_rec_clk_code = get_std(std_param, ORDER, 'rec_clk_code_C');
+    QZS_rec_clk_code = get_std(std_param, ORDER, 'rec_clk_code_J');
     % get estimated phase receiver clock errors for all GNSS
-    GPS_rec_clk_phase = std_param(10,:);   	% [m]
-    GLO_rec_clk_phase = std_param(11,:);
-    GAL_rec_clk_phase = std_param(12,:);
-    BDS_rec_clk_phase = std_param(13,:);
-    QZS_rec_clk_phase = std_param(14,:);
+    GPS_rec_clk_phase = get_std(std_param, ORDER, 'rec_clk_phase_G');    % [m]
+    GLO_rec_clk_phase = get_std(std_param, ORDER, 'rec_clk_phase_R');
+    GAL_rec_clk_phase = get_std(std_param, ORDER, 'rec_clk_phase_E');
+    BDS_rec_clk_phase = get_std(std_param, ORDER, 'rec_clk_phase_C');
+    QZS_rec_clk_phase = get_std(std_param, ORDER, 'rec_clk_phase_J');
     if isGPS && any(~isnan(GPS_rec_clk_code))
         plot(hours, GPS_rec_clk_code, 'r-');
         leg_txt_clk{i} = 'dt_{code}^{G}'; i=i+1;
@@ -148,7 +156,7 @@ elseif DecoupledClockModel
     if isBDS && any(~isnan(BDS_rec_clk_code))
         plot(hours, BDS_rec_clk_code, 'm-');
         leg_txt_clk{i} = 'dt_{code}^{C}';
-        plot(hours, BDS_rec_clk_code, 'm--');
+        plot(hours, BDS_rec_clk_phase, 'm--');
         leg_txt_clk{i} = 'dt_{phase}^{C}';
     end
     if isQZSS && any(~isnan(QZS_rec_clk_code))
@@ -176,17 +184,17 @@ if estimate_dcbs && ~DecoupledClockModel
     subplot(n,1,3);
     leg_txt_biases = {}; j = 1;
     hold on
-    GPS_IFB = std_param(06,:);    % [m]!
-    GPS_dcb_2 = std_param(07,:);
-    GLO_dcb_1 = std_param(09,:);
-    GLO_dcb_2 = std_param(10,:);
-    GAL_dcb_1 = std_param(12,:);
-    GAL_dcb_2 = std_param(13,:);
-    BDS_dcb_1 = std_param(15,:);
-    BDS_dcb_2 = std_param(16,:);
+    GPS_dcb_1 = get_std(std_param, ORDER, 'dcb_1_G');   % [m]!
+    GPS_dcb_2 = get_std(std_param, ORDER, 'dcb_2_G');   
+    GLO_dcb_1 = get_std(std_param, ORDER, 'dcb_1_R');   
+    GLO_dcb_2 = get_std(std_param, ORDER, 'dcb_2_R');   
+    GAL_dcb_1 = get_std(std_param, ORDER, 'dcb_1_E');   
+    GAL_dcb_2 = get_std(std_param, ORDER, 'dcb_2_E');   
+    BDS_dcb_1 = get_std(std_param, ORDER, 'dcb_1_C');   
+    BDS_dcb_2 = get_std(std_param, ORDER, 'dcb_2_C');   
     % plot
-    if any(~isnan(GPS_IFB)) && isGPS
-        plot(hours, GPS_IFB*m2ns, 'r-');
+    if any(~isnan(GPS_dcb_1)) && isGPS
+        plot(hours, GPS_dcb_1*m2ns, 'r-');
         leg_txt_biases{j} = 'DCB_{1}^{G}'; j=j+1;
         if any(~isnan(GPS_dcb_2))
             plot(hours, GPS_dcb_2*m2ns, 'r--');
@@ -218,8 +226,8 @@ if estimate_dcbs && ~DecoupledClockModel
         end
     end
     if isQZSS
-        QZSS_dcb_1 = std_param(15,:);
-        QZSS_dcb_2 = std_param(16,:);
+        QZSS_dcb_1 = get_std(std_param, ORDER, 'dcb_1_J');   
+        QZSS_dcb_2 = get_std(std_param, ORDER, 'dcb_2_J');   
         if any(~isnan(QZSS_dcb_1))
             plot(hours, QZSS_dcb_1*m2ns, 'g-');
             leg_txt_biases{j} = 'DCB_{1}^{J}'; j=j+1;
@@ -246,23 +254,23 @@ elseif DecoupledClockModel
     leg_txt_biases = {}; j = 1;
     hold on
     % receiver interfrequency bias
-    GPS_IFB = std_param(15,:) * m2ns;       % [ns]!
-    GLO_IFB = std_param(16,:) * m2ns;
-    GAL_IFB = std_param(17,:) * m2ns;
-    BDS_IFB = std_param(18,:) * m2ns;
-    QZS_IFB = std_param(19,:) * m2ns;
+    GPS_IFB = get_std(std_param, ORDER, 'IFB_G') * m2ns;       % [ns]!
+    GLO_IFB = get_std(std_param, ORDER, 'IFB_R') * m2ns;
+    GAL_IFB = get_std(std_param, ORDER, 'IFB_E') * m2ns;
+    BDS_IFB = get_std(std_param, ORDER, 'IFB_C') * m2ns;
+    QZS_IFB = get_std(std_param, ORDER, 'IFB_J') * m2ns;
     % receiver L2 bias
-    GPS_L2  = std_param(20,:) * m2ns;       % [ns]!
-    GLO_L2  = std_param(21,:) * m2ns;
-    GAL_L2  = std_param(22,:) * m2ns;
-    BDS_L2  = std_param(23,:) * m2ns;
-    QZS_L2  = std_param(24,:) * m2ns;
+    GPS_L2  = get_std(std_param, ORDER, 'L2_bias_G') * m2ns;    % [ns]!
+    GLO_L2  = get_std(std_param, ORDER, 'L2_bias_R') * m2ns;
+    GAL_L2  = get_std(std_param, ORDER, 'L2_bias_E') * m2ns;
+    BDS_L2  = get_std(std_param, ORDER, 'L2_bias_C') * m2ns;
+    QZS_L2  = get_std(std_param, ORDER, 'L2_bias_J') * m2ns;
     % receiver L3 bias 
-    GPS_L3  = std_param(25,:) * m2ns;       % [ns]!
-    GLO_L3  = std_param(26,:) * m2ns;
-    GAL_L3  = std_param(27,:) * m2ns;
-    BDS_L3  = std_param(28,:) * m2ns;
-    QZS_L3  = std_param(29,:) * m2ns;
+    GPS_L3  = get_std(std_param, ORDER, 'L3_bias_G') * m2ns;       % [ns]!
+    GLO_L3  = get_std(std_param, ORDER, 'L3_bias_R') * m2ns;
+    GAL_L3  = get_std(std_param, ORDER, 'L3_bias_E') * m2ns;
+    BDS_L3  = get_std(std_param, ORDER, 'L3_bias_C') * m2ns;
+    QZS_L3  = get_std(std_param, ORDER, 'L3_bias_J') * m2ns;
     % plot estimated receiver biases
     if isGPS
         if settings.INPUT.proc_freqs >= 3
@@ -346,6 +354,12 @@ elseif DecoupledClockModel
     set(dcm, 'updatefcn', @vis_customdatatip_stdev_para)
 end
 
+
+
+function std = get_std(STD, ORDER, p)
+% get std for a specific parameter by checking its location in ORDER_PARAM
+bool = strcmp(ORDER, p);
+std = STD(bool, :);
 
 
 

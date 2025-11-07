@@ -17,10 +17,6 @@ function  [input] = read_brdc(settings, input, leap_sec, glo_channels)
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
-
-input.ORBCLK.Eph_GPS = [];     input.ORBCLK.Eph_GLO = [];     
-input.ORBCLK.Eph_GAL = [];     input.ORBCLK.Eph_BDS = [];     
-
 bool_print = ~settings.INPUT.bool_parfor;
 
 

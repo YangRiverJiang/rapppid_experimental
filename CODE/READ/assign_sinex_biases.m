@@ -229,7 +229,7 @@ end
 
 
 
-%% --- Glonass ---
+%% --- GLONASS ---
 if glo_on
     GLO_obs = obs.GLO;
     
@@ -488,12 +488,27 @@ if bds_on
         if bool_OSB
             if isfield(SinexOSB.(sat_), BDS_obs.L1)   	% Phase 1, OSB
                 L1_ = save_data(SinexOSB.(sat_).(BDS_obs.L1), week, 300+ii, 1, L1_, 1);
+            else
+                foundbias = findPhaseBias(SinexOSB.(sat_), BDS_obs.L1, settings.INPUT.bds_ranking);
+                if ~isempty(foundbias)
+                    L1_ = save_data(SinexOSB.(sat_).(foundbias), week, 300+ii, 1, L1_, 1);
+                end                
             end
             if isfield(SinexOSB.(sat_), BDS_obs.L2)  	% Phase 2, OSB
                 L2_ = save_data(SinexOSB.(sat_).(BDS_obs.L2), week, 300+ii, 1, L2_, 1);
+            else
+                foundbias = findPhaseBias(SinexOSB.(sat_), BDS_obs.L2, settings.INPUT.bds_ranking);
+                if ~isempty(foundbias)
+                    L2_ = save_data(SinexOSB.(sat_).(foundbias), week, 300+ii, 1, L2_, 1);
+                end                 
             end
             if isfield(SinexOSB.(sat_), BDS_obs.L3)  	% Phase 3, OSB
                 L3_ = save_data(SinexOSB.(sat_).(BDS_obs.L3), week, 300+ii, 1, L3_, 1);
+            else
+                foundbias = findPhaseBias(SinexOSB.(sat_), BDS_obs.L3, settings.INPUT.bds_ranking);
+                if ~isempty(foundbias)
+                    L3_ = save_data(SinexOSB.(sat_).(foundbias), week, 300+ii, 1, L3_, 1);
+                end                     
             end
         end
     end             % end of loop over BeiDou satellites
@@ -558,18 +573,33 @@ if qzss_on
             % ||| no DSBs for phase implemented
         end
         
-%         % --- Phase Biases ---
-%         if bool_OSB
-%             if isfield(SinexOSB.(sat_), QZSS_obs.L1)   	% Phase 1, OSB
-%                 L1_ = save_data(SinexOSB.(sat_).(QZSS_obs.L1), week, 400+ii, 1, L1_, 1);
-%             end
-%             if isfield(SinexOSB.(sat_), QZSS_obs.L2)  	% Phase 2, OSB
-%                 L2_ = save_data(SinexOSB.(sat_).(QZSS_obs.L2), week, 400+ii, 1, L2_, 1);
-%             end
-%             if isfield(SinexOSB.(sat_), QZSS_obs.L3)  	% Phase 3, OSB
-%                 L3_ = save_data(SinexOSB.(sat_).(QZSS_obs.L3), week, 400+ii, 1, L3_, 1);
-%             end
-%         end
+        % --- Phase Biases ---
+        if bool_OSB
+            if isfield(SinexOSB.(sat_), QZSS_obs.L1)   	% Phase 1, OSB
+                L1_ = save_data(SinexOSB.(sat_).(QZSS_obs.L1), week, 400+ii, 1, L1_, 1);
+            else
+                foundbias = findPhaseBias(SinexOSB.(sat_), QZSS_obs.L1, settings.INPUT.qzss_ranking);
+                if ~isempty(foundbias)
+                    L1_ = save_data(SinexOSB.(sat_).(foundbias), week, 400+ii, 1, L1_, 1);
+                end  
+            end
+            if isfield(SinexOSB.(sat_), QZSS_obs.L2)  	% Phase 2, OSB
+                L2_ = save_data(SinexOSB.(sat_).(QZSS_obs.L2), week, 400+ii, 1, L2_, 1);
+            else
+                foundbias = findPhaseBias(SinexOSB.(sat_), QZSS_obs.L2, settings.INPUT.qzss_ranking);
+                if ~isempty(foundbias)
+                    L2_ = save_data(SinexOSB.(sat_).(foundbias), week, 400+ii, 1, L2_, 1);
+                end                  
+            end
+            if isfield(SinexOSB.(sat_), QZSS_obs.L3)  	% Phase 3, OSB
+                L3_ = save_data(SinexOSB.(sat_).(QZSS_obs.L3), week, 400+ii, 1, L3_, 1);
+            else
+                foundbias = findPhaseBias(SinexOSB.(sat_), QZSS_obs.L3, settings.INPUT.qzss_ranking);
+                if ~isempty(foundbias)
+                    L3_ = save_data(SinexOSB.(sat_).(foundbias), week, 400+ii, 1, L3_, 1);
+                end                  
+            end
+        end
     end             % end of loop over QZSS satellites
 end
 
@@ -649,7 +679,8 @@ idx_G = 001:099;   idx_R = 101:199;   idx_E = 201:299;   idx_C = 301:399;   idx_
 % CNES integer recovery clock does not need additional phase biases
 CNES_int_rec = strcmp(settings.BIASES.code, 'CODE MGEX') && settings.AMBFIX.bool_AMBFIX ...
         && settings.ORBCLK.bool_precise && strcmp(settings.ORBCLK.prec_prod, 'CNES');
-% Some Code Biases are zero in CODE MGEX: GPS C1W and C2W, Galileo C1C and C5Q 
+% Some Code Biases are zero in CODE MGEX (e.g., GPS C1W and C2W, Galileo
+% C1C and C5Q)
 CODE_MGEX = strcmp(settings.BIASES.code, 'CODE MGEX');
 
 % --- check code biases ----
@@ -691,7 +722,7 @@ if bool_OSB
         
         if settings.INPUT.use_QZSS && ~isempty(obs.use_column{4,3+i})
             if all(all(obs.([frq '_bias']).value(1,idx_J,:) == 0))
-                if ~(CODE_MGEX && contains(obs.QZSS.(frq), {'C1C', 'C2L'}))      % ||| check this
+                if ~(CODE_MGEX && contains(obs.QZSS.(frq), {'C1C', 'C2L', 'C5Q'}))      % ||| check this
                     error_str = [error_str 'J' obs.QZSS.(frq) ', '];
                 end
             end

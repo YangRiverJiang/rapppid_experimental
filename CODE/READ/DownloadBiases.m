@@ -41,29 +41,40 @@ switch settings.BIASES.code
         file = file_3;                      % try first file
         [~, decompr, ~] = fileparts(file);  % remove the zip file extension
         if ~isfile([target file]) && ~isfile([target decompr])
-            try websave([target file], [httpserver '/' file]); end      %#ok<*TRYNC>
+            try websave([target file], [httpserver '/' file]); 
+            catch; delete([target file '.html']); end
         end
         if ~isfile([target file]) && ~isfile([target decompr])
             file = file_2;      [~, decompr, ~] = fileparts(file);
-            try websave([target file], [httpserver '/' file]); end
+            try websave([target file], [httpserver '/' file]); 
+            catch; delete([target file '.html']); end
         end
         if ~isfile([target file]) && ~isfile([target decompr])
             file = file_1;      [~, decompr, ~] = fileparts(file);
-            try websave([target file], [httpserver '/' file]); end
+            try websave([target file], [httpserver '/' file]); 
+            catch; delete([target file '.html']); end
         end
         if ~isfile([target file]) && ~isfile([target decompr])
             file = file_0;      [~, decompr, ~] = fileparts(file);
-            try websave([target file], [httpserver '/' file]); end
+            try websave([target file], [httpserver '/' file]); 
+            catch; delete([target file '.html']);  end
         end    
         if ~isfile([target file]) && ~isfile([target decompr])
             file = file_0;      [~, decompr, ~] = fileparts(file);
-            try websave([target file], [httpserver '/' file]); 
+            try 
+                websave([target file], [httpserver '/' file]); 
             catch
+                delete([target file '.html']);
                 % for example 2020/001 (My First PPP Processing)
                 URL_host = 'igs.ign.fr:21';     
                 URL_folder = {['/pub/igs/products/mgex/dcb/' yyyy '/']};
                 file_status = ftp_download(URL_host, URL_folder{1}, file, target, true);
                 [~, decompr, ~] = fileparts(file);
+
+                % CAS0MGXRAP_20200010000_01D_01D_DCB.BSX.gz 
+                % https://cddis.nasa.gov/archive/gnss/products/mgex/dcb/2020/
+               
+
             end
         end           
         % unzip if download was successful
@@ -86,19 +97,23 @@ switch settings.BIASES.code
         file = file_3;                      % try first file
         [~, decompr, ~] = fileparts(file);  % remove the zip file extension
         if ~isfile([target file]) && ~isfile([target decompr])
-            try websave([target file], [httpserver '/' file]); end
+            try websave([target file], [httpserver '/' file]); 
+            catch; delete([target file '.html']);  end
         end
         if ~isfile([target file]) && ~isfile([target decompr])
             file = file_2;      [~, decompr, ~] = fileparts(file);
-            try websave([target file], [httpserver '/' file]); end
+            try websave([target file], [httpserver '/' file]); 
+            catch; delete([target file '.html']);  end
         end
         if ~isfile([target file]) && ~isfile([target decompr])
             file = file_1;      [~, decompr, ~] = fileparts(file);
-            try websave([target file], [httpserver '/' file]); end
+            try websave([target file], [httpserver '/' file]); 
+            catch; delete([target file '.html']);  end
         end
         if ~isfile([target file]) && ~isfile([target decompr])
             file = file_0;      [~, decompr, ~] = fileparts(file);
-            try websave([target file], [httpserver '/' file]); end
+            try websave([target file], [httpserver '/' file]); 
+            catch; delete([target file '.html']);  end
         end       
         % unzip if download was successful
         decompressed = unzip_and_delete({file}, {target});

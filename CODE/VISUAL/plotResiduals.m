@@ -56,15 +56,6 @@ elseif settings.PLOT.fixed
     end    
 end
 
-% in case of Kalman-Filter omc is saved as residuals and somehow big values
-% in reset epochs
-if strcmp(settings.ADJ.filter.type, 'Kalman Filter')
-    code_residuals(:,storeData.float_reset_epochs) = 0;
-    if strcmpi(settings.PROC.method,'Code + Phase')
-        phase_residuals(:,storeData.float_reset_epochs) = 0;
-    end
-end
-
 % prepare some variables
 obs_bool = logical(full(satellites.obs));   % number of epochs satellite is tracked
 idx = 1:size(obs_bool,2);
@@ -124,7 +115,7 @@ if settings.INPUT.use_GPS
     vis_plotResiduals(epochs, reset_h, hours, label_x, Res_code_GPS, Res_phase_GPS, gps_prns, txtcell, elev(:,1:DEF.SATS_GPS), cutoff, rgb);
 end
 
-% Glonass
+% GLONASS
 if settings.INPUT.use_GLO
     Res_code_GLO = code_residuals(:, 101:100+DEF.SATS_GLO, :);
     if bool_plot_phase
@@ -132,7 +123,7 @@ if settings.INPUT.use_GLO
     end
     glo_prns = obs_prns(obs_prns>100 & obs_prns<200);
     % Plot
-    txtcell = {'Glonass', 'R', solution_string};
+    txtcell = {'GLONASS', 'R', solution_string};
     vis_plotResiduals(epochs, reset_h, hours, label_x, Res_code_GLO, Res_phase_GLO, glo_prns-100, txtcell, elev(:,101:(100+DEF.SATS_GLO)), cutoff, rgb);
 end
 

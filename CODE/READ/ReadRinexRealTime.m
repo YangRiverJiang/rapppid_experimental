@@ -19,7 +19,7 @@ function [RINEX, fid_obs, fid_nav, fid_corr, input, obs] = ...
 %   obs             struct, updated with new data
 %
 % Revision:
-%   ...
+%   2025/08/14, MFWG: switch to cal2gpstime
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -35,12 +35,9 @@ while true
     
     if ~isempty(line) && line(1) == '>'
         % new observation record, check time
-        linvalues = textscan(line,'%*c %f %f %f %f %f %f %d %2d %f');
+        lvalues = textscan(line,'%*c %f %f %f %f %f %f %d %2d %f');
         % convert date into gps-time [sow]
-        h = linvalues{4} + linvalues{5}/60 + linvalues{6}/3600;             % fractional hour
-        jd = cal2jd_GT(linvalues{1}, linvalues{2}, linvalues{3} + h/24);    % Julian date
-        [~, gps_time,~] = jd2gps_GT(jd);                             % gps-time [sow] and gps-week
-        gpstime = double(gps_time);
+        [~, gpstime] = cal2gpstime([lvalues{1}, lvalues{2}, lvalues{3}, lvalues{4}, lvalues{5}, lvalues{6}]);
         
         if start_sow <= gpstime
             % processing has already started

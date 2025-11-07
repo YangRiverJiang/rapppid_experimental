@@ -10,8 +10,10 @@ switch string_gnss
         char = 'G';
     case 'GLO'
         char = 'R';
-    case 'Glonass'
+    case 'GLONASS'
         char = 'R';
+    case 'Glonass'
+        char = 'R';		
     case 'GAL'
         char = 'E';
     case 'Galileo'

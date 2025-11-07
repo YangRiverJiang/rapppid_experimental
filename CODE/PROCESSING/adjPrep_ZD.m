@@ -155,7 +155,7 @@ if bool_filter
     if settings.ADJ.satellite.bool
         % use dynamic prediction for satellite PPP
         [Adjust.param_pred(1:6), Transition] = DynamicPredictionPosVel(...
-            Adjust.param, Epoch, obs, settings, Transition, Adjust.reset_time);
+            Adjust.param, Epoch, obs, settings, Transition, Adjust.reset_time, Adjust.float);
     end
     
     

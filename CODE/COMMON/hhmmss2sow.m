@@ -1,5 +1,5 @@
 function sow = hhmmss2sow(hh, mm, ss, startdate)
-% Convert hours. minutes and seconds to seconds of week (GPS time).
+% Convert hours, minutes and seconds to seconds of week (GPS time).
 % 
 % INPUT:
 % 	hh          hours
@@ -10,18 +10,10 @@ function sow = hhmmss2sow(hh, mm, ss, startdate)
 %	sow         seconds of week (GPS time)
 %
 % Revision:
-%   ...
+% 2025/08/14, MFWG: switch to cal2gpstime
 %
 % This function belongs to raPPPid, Copyright (c) 2025, M.F. Wareyka-Glaner
 % *************************************************************************
 
-
-% get year, month, and day of processed file
-year  = startdate(1);
-month = startdate(2);
-day   = startdate(3);
-
 % convert to julian date and then seconds of week (GPS time)
-day_ = day + hh/24 + mm/1440 + ss/86400;
-jd = cal2jd_GT(year, month, day_);
-[~, sow, ~] = jd2gps_GT(jd);
+[~, sow] = cal2gpstime([startdate(1:3) hh mm ss]);

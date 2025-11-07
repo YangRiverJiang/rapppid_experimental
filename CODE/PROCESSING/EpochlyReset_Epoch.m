@@ -28,6 +28,7 @@ end
 Epoch.gps_time = [];
 Epoch.gps_week = [];
 Epoch.mjd = [];
+Epoch.time = NaT;
 % observations
 Epoch.obs = [];
 Epoch.LLI_bit_rinex = [];       % LLI bit from Rinex file
@@ -85,10 +86,12 @@ Epoch.MP_c = [];
 Epoch.MP_p = [];
 % cycle slip variables
 Epoch.cs_found = [];
-Epoch.cs_dL1dL2 = [];
+Epoch.cs_dL1dL2 = [];               % dLi - dLj
 Epoch.cs_dL1dL3 = [];
 Epoch.cs_dL2dL3 = [];
 Epoch.cs_pred_SF = NaN(410,1);
+Epoch.cs_HMW = [];                  % HMW LC
+Epoch.cs_L1_diff = [];
 % satellite status
 Epoch.sat_status = [];
 % multipath detection

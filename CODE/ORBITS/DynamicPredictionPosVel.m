@@ -1,5 +1,5 @@
 function [param_pred, Transition] = DynamicPredictionPosVel(param, ...
-    Epoch, obs, settings, Transition, last_reset)
+    Epoch, obs, settings, Transition, last_reset, bool_float)
 % blablabla
 %
 % INPUT:
@@ -8,7 +8,8 @@ function [param_pred, Transition] = DynamicPredictionPosVel(param, ...
 %   obs             struct, observation-specific data
 %   settings        struct, processing settings from GUI
 %   Transition      Transition matrix
-%   last_reset      
+%   last_reset      time of last reset [sod]
+%   bool_float      boolean, true if valid float solution
 % OUTPUT:
 %	param_pred      1x6, dynamic prediction of position and velocity
 %   Transition      Transition matrix, updated
@@ -20,8 +21,18 @@ function [param_pred, Transition] = DynamicPredictionPosVel(param, ...
 % *************************************************************************
 
 
-
 % ||| check and comment
+
+
+% create time vector        ||| check this
+time_total = Epoch.gps_time - last_reset;
+dt = obs.interval;
+if Epoch.q > 1 && bool_float
+    dt = Epoch.gps_time - Epoch.old.gps_time;       % time since last epoch
+end
+vec = time_total : dt : time_total+dt;
+
+
 F_rad_grav = transition_radius(param, Epoch, obs, settings.ADJ.satellite);
 [F_rad_drag, F_vel_drag] = transition_drag(param, settings.ADJ.satellite);
 
@@ -41,19 +52,11 @@ F_combined_vel = F_vel_drag + CoriolisMat;
 
 F_matrix = [zeros(3) eye(3); F_combined_rad F_combined_vel];
 
-Transition(1:6,1:6) = eye(6) + F_matrix*obs.interval;
+Transition(1:6,1:6) = eye(6) + F_matrix*dt;
 
 opts = odeset('RelTol', 1e-9, 'AbsTol', 1e-9);
 
-% create time vector        ||| check this
-time_total = Epoch.gps_time - last_reset;
-dt = obs.interval;
-if Epoch.q > 1
-    dt = Epoch.gps_time - Epoch.old.gps_time;       % time since last epoch
-end
-vec = time_total : dt : time_total+dt;
 
-
-[~, state_vec] = ode45(@(t, X) rhs_orbital_motion(t, X, settings.ADJ.satellite,  Epoch, obs, [0;0;0]), ...
+[~, state_vec] = ode45(@(t, X) rhs_orbital_motion(t, X, settings.ADJ.satellite,  Epoch, obs, [0;0;0], vec(1)), ...
     vec, param(1:6), opts);
 param_pred(1:6) = state_vec(end, 1:6)';

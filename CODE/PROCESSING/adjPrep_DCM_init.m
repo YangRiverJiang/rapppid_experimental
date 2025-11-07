@@ -34,6 +34,18 @@ QZS = settings.INPUT.use_QZSS;
 % check if velocity is estimated
 velo = settings.ADJ.satellite.bool;
 
+% check number of processed frequencies for each GNSS
+n_G = sum(settings.INPUT.gps_freq_idx  <= DEF.freq_GPS(end));
+n_R = sum(settings.INPUT.glo_freq_idx  <= DEF.freq_GLO(end));
+n_E = sum(settings.INPUT.gal_freq_idx  <= DEF.freq_GAL(end));
+n_C = sum(settings.INPUT.bds_freq_idx  <= DEF.freq_BDS(end));
+n_J = sum(settings.INPUT.qzss_freq_idx <= DEF.freq_QZSS(end));
+GPS_3f = GPS && (n_G >= 3);   GPS_2f = GPS && (n_G >= 2);
+GLO_3f = GLO && (n_R >= 3);   GLO_2f = GLO && (n_R >= 2);
+GAL_3f = GAL && (n_E >= 3);   GAL_2f = GAL && (n_E >= 2);
+BDS_3f = BDS && (n_C >= 3);   BDS_2f = BDS && (n_C >= 2);
+QZS_3f = QZS && (n_J >= 3);   QZS_2f = QZS && (n_J >= 2);
+
 % check for processing settings
 bool_code_phase = strcmpi(settings.PROC.method,'Code + Phase');   % true, if code+phase processing
 bool_filter = ~strcmp(FILTER.type, 'No Filter');    % true if filter is enabled
@@ -54,6 +66,7 @@ iono_idx = (1+NO_PARAM+no_ambig):(NO_PARAM+no_ambig+no_sats);
 %% parameter vector
 param_vec = zeros(NO_PARAM + no_ambig + no_sats, 1);  % 32 + #ambiguities + #ionospheric delays
 param_vec(1:3,1) = settings.INPUT.pos_approx;       % approximate position (X,Y,Z)
+param_pred = param_vec;         % no prediction in first epoch
 % other parameters don´t have approximate values so they are zero
 
 
@@ -78,23 +91,23 @@ if GAL;     param_sigma(15,15) = FILTER.var_rclk_gps;       end
 if BDS;     param_sigma(16,16) = FILTER.var_rclk_gal;       end
 if QZS;     param_sigma(17,17) = FILTER.var_rclk_gps;       end
 % Interfrequency Bias (IFB)
-if GPS;     param_sigma(18,18) = FILTER.var_DCB;        end
-if GLO;     param_sigma(19,19) = FILTER.var_DCB;        end
-if GAL;     param_sigma(20,20) = FILTER.var_DCB;        end
-if BDS;     param_sigma(21,21) = FILTER.var_DCB;        end
-if QZS;     param_sigma(22,22) = FILTER.var_DCB;        end
+if GPS_3f;  param_sigma(18,18) = FILTER.var_DCB;            end
+if GLO_3f;  param_sigma(19,19) = FILTER.var_DCB;            end
+if GAL_3f;  param_sigma(20,20) = FILTER.var_DCB;            end
+if BDS_3f;  param_sigma(21,21) = FILTER.var_DCB;            end
+if QZS_3f;  param_sigma(22,22) = FILTER.var_DCB;            end
 % L2 phase bias
-if GPS;     param_sigma(23,23) = FILTER.var_DCB;        end
-if GLO;     param_sigma(24,24) = FILTER.var_DCB;        end
-if GAL;     param_sigma(25,25) = FILTER.var_DCB;        end
-if BDS;     param_sigma(26,26) = FILTER.var_DCB;        end
-if QZS;     param_sigma(27,27) = FILTER.var_DCB;        end
+if GPS_2f;  param_sigma(23,23) = FILTER.var_DCB;            end
+if GLO_2f;  param_sigma(24,24) = FILTER.var_DCB;            end
+if GAL_2f;  param_sigma(25,25) = FILTER.var_DCB;            end
+if BDS_2f;  param_sigma(26,26) = FILTER.var_DCB;            end
+if QZS_2f;  param_sigma(27,27) = FILTER.var_DCB;            end
 % L3 phase bias
-if GPS;     param_sigma(28,28) = FILTER.var_DCB;        end
-if GLO;     param_sigma(29,29) = FILTER.var_DCB;        end
-if GAL;     param_sigma(30,30) = FILTER.var_DCB;        end
-if BDS;     param_sigma(31,31) = FILTER.var_DCB;        end
-if QZS;     param_sigma(32,32) = FILTER.var_DCB;        end
+if GPS_3f;  param_sigma(28,28) = FILTER.var_DCB;            end
+if GLO_3f;  param_sigma(29,29) = FILTER.var_DCB;            end
+if GAL_3f;  param_sigma(30,30) = FILTER.var_DCB;            end
+if BDS_3f;  param_sigma(31,31) = FILTER.var_DCB;            end
+if QZS_3f;  param_sigma(32,32) = FILTER.var_DCB;            end
 % float ambiguities
 param_sigma(N_idx,N_idx) = N_eye*FILTER.var_amb;
 % ionospheric delay
@@ -121,23 +134,23 @@ if bool_filter
     if BDS;     Noise(16,16) = FILTER.Q_rclk_bds;       end
     if QZS;     Noise(17,17) = FILTER.Q_rclk_qzss;      end
     % Interfrequency Bias (IFB)
-    if GPS;     Noise(18,18) = FILTER.Q_DCB;            end
-    if GLO;     Noise(19,19) = FILTER.Q_DCB;            end
-    if GAL;     Noise(20,20) = FILTER.Q_DCB;            end
-    if BDS;     Noise(21,21) = FILTER.Q_DCB;            end
-    if QZS;     Noise(22,22) = FILTER.Q_DCB;            end
+    if GPS_3f;  Noise(18,18) = FILTER.Q_DCB;            end
+    if GLO_3f;  Noise(19,19) = FILTER.Q_DCB;            end
+    if GAL_3f;  Noise(20,20) = FILTER.Q_DCB;            end
+    if BDS_3f;  Noise(21,21) = FILTER.Q_DCB;            end
+    if QZS_3f;  Noise(22,22) = FILTER.Q_DCB;            end
     % L2 phase bias
-    if GPS;     Noise(23,23) = FILTER.Q_DCB;            end
-    if GLO;     Noise(24,24) = FILTER.Q_DCB;            end
-    if GAL;     Noise(25,25) = FILTER.Q_DCB;            end
-    if BDS;     Noise(26,26) = FILTER.Q_DCB;            end
-    if QZS;     Noise(27,27) = FILTER.Q_DCB;            end
+    if GPS_2f;  Noise(23,23) = FILTER.Q_DCB;            end
+    if GLO_2f;  Noise(24,24) = FILTER.Q_DCB;            end
+    if GAL_2f;  Noise(25,25) = FILTER.Q_DCB;            end
+    if BDS_2f;  Noise(26,26) = FILTER.Q_DCB;            end
+    if QZS_2f;  Noise(27,27) = FILTER.Q_DCB;            end
     % L3 phase bias
-    if GPS;     Noise(28,28) = FILTER.Q_DCB;            end
-    if GLO;     Noise(29,29) = FILTER.Q_DCB;            end
-    if GAL;     Noise(30,30) = FILTER.Q_DCB;            end
-    if BDS;     Noise(31,31) = FILTER.Q_DCB;            end
-    if QZS;     Noise(32,32) = FILTER.Q_DCB;            end
+    if GPS_3f;  Noise(28,28) = FILTER.Q_DCB;            end
+    if GLO_3f;  Noise(29,29) = FILTER.Q_DCB;            end
+    if GAL_3f;  Noise(30,30) = FILTER.Q_DCB;            end
+    if BDS_3f;  Noise(31,31) = FILTER.Q_DCB;            end
+    if QZS_3f;  Noise(32,32) = FILTER.Q_DCB;            end
     
     
     
@@ -190,7 +203,7 @@ end
 %% save to Adjust
 % --- parameter vector ---
 Adjust.param = param_vec;
-Adjust.param_pred = Adjust.param;           % no prediction in first epoch
+Adjust.param_pred = param_pred;
 
 % --- covariance matrix ---
 Adjust.param_sigma      = param_sigma;

@@ -14,9 +14,14 @@ if ~isempty(handles.paths.lastproc) && isfolder(handles.paths.lastproc)
     if strcmp(choice, 'No')
         return
     end
-    
+
     path_last_proc = handles.paths.lastproc;
-    load([path_last_proc '/data4plot.mat'], 'settings', 'obs')
+    if isfile([path_last_proc '/data4plot.mat'])
+        load([path_last_proc '/data4plot.mat'], 'settings', 'obs')
+    else
+        settings = struct;
+        obs = struct;
+    end
     
     %% Delete last processing
     if strcmp(choice, 'Yes')
@@ -53,7 +58,7 @@ if ~isempty(handles.paths.lastproc) && isfolder(handles.paths.lastproc)
     
     % check which *.mat-files could have been used
     % - Clock
-    if  isfield(settings.ORBCLK, 'file_clk') 
+    if isfield(settings, 'ORBCLK') && isfield(settings.ORBCLK, 'file_clk') 
         clk_file = settings.ORBCLK.file_clk;
         % check for auto-detection
         if contains(clk_file, '$')
@@ -66,7 +71,7 @@ if ~isempty(handles.paths.lastproc) && isfolder(handles.paths.lastproc)
         end
     end
     % - (Code) Biases
-    if isfield(settings.BIASES, 'code_file') && ~iscell(settings.BIASES.code_file)
+    if isfield(settings, 'BIASES') && isfield(settings.BIASES, 'code_file') && ~iscell(settings.BIASES.code_file)
         path_sinex = settings.BIASES.code_file;
         % check for auto-detection Sinex-File
         if contains(path_sinex, '$')
@@ -78,7 +83,7 @@ if ~isempty(handles.paths.lastproc) && isfolder(handles.paths.lastproc)
             mat_bias = path_sinex;
         end
     end
-    if isfield(settings.ORBCLK, 'file_corr2brdc') && exist([settings.ORBCLK.file_corr2brdc '.mat'], 'file')     
+    if isfield(settings, 'ORBCLK') && isfield(settings.ORBCLK, 'file_corr2brdc') && exist([settings.ORBCLK.file_corr2brdc '.mat'], 'file')     
         mat_stream = settings.ORBCLK.file_corr2brdc;
     end
     

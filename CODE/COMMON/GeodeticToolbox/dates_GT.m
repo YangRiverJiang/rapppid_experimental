@@ -5,7 +5,7 @@
 %  - Year, Decimal Year
 %  - GPS week, seconds of week
 %
-% Required M-files: cal2jd_GT, doy2jd_GT, gps2jd_GT, jd2cal_GT, jd2dow_GT, jd2doy_GT, jd2gpsa
+% Required M-files: cal2jd_GT, doy2jd_GT, gps2jd_GT, jd2cal_GT, jd2dow_GT, jd2doy_GT, jd2gps_GT
 
 % Created 24 May 96, M. Craymer
 % Modified 03 Aug 96, Converted to MATLAB

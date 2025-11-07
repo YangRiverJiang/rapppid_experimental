@@ -1,5 +1,5 @@
 function x = ins_vec_el(vec, pos, el)
-% insert element into vector at defined position(s)
+% insert an element into vector at defined position(s)
 %
 % INPUT: 
 %  	vec:  	vector where an element should be inserted, [| vector]
@@ -8,17 +8,27 @@ function x = ins_vec_el(vec, pos, el)
 % 	el:    	element to insert
 % OUPUT:
 %  	x:      (new) vector with inserted element(s), [| vector]
-%
+% 
+% Revision:
+%   2025/09/12, MFWG: replace loop with a vectorized version
+% 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
+% number of elements
+n = numel(vec);
+m = numel(pos);
 
-pos = sort(pos);                    % sort in ascending order
-for i = 1:length(pos)
-    lgth = length(vec);             % length of vector
-    x = [vec(1:pos(i)-1); el; vec(pos(i):lgth)];      % insert element
-    vec = x;
-end
+% initialize output vector
+x = zeros(n+m, 1);
+
+% logical mask for insert positions
+mask = false(n+m, 1);
+mask(pos) = true;
+
+% Fill result
+x(mask)  = el;
+x(~mask) = vec;
 
 end
 

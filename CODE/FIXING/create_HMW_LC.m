@@ -1,4 +1,4 @@
-function [HMW_12, HMW_23, HMW_13] = create_HMW_LC(Epoch, settings, HMW_12, HMW_23, HMW_13, z)
+function Adjust = create_HMW_LC(Epoch, settings, Adjust, z)
 % This function builds the HMW LC (used for WL fixing) depending on the
 % number of input frequencies
 % Since the HWM LC is used for the WL fixing, the APC model correction is
@@ -8,11 +8,10 @@ function [HMW_12, HMW_23, HMW_13] = create_HMW_LC(Epoch, settings, HMW_12, HMW_2
 % INPUT:
 %	Epoch           struct, epoch-specific data
 %   settings        struct, processing settings from GUI
-%   HMW_12,...      matrix, HMW LC for all epochs and satellites between 1st
-%                   and 2nd or 2nd and 3rd frequency
+%   Adjust          struct, variables relevant for parameter estimation
 %   z               correction due to antenna phase centers
 % OUTPUT:
-%   HMW_12,...      filled with HMW LC of current epoch
+%   Adjust          struct, filled with HMW LC of current epoch 
 %
 % Revision:
 %   ...
@@ -41,7 +40,7 @@ if settings.INPUT.num_freqs >= 2
     % between first and second frequency
     HMW12_epoch = (f1.*L1-f2.*L2) ./ (f1-f2) - ...
         (f1.*C1+f2.*C2) ./ (f1+f2);
-    HMW_12(q,sats) = HMW12_epoch .* ((f1-f2)./Const.C); % convert to [cyc] and save
+    Adjust.HMW_12(q,sats) = HMW12_epoch .* ((f1-f2)./Const.C); % convert to [cyc] and save
 end
 
 % Build HMW LCs using third frequency
@@ -51,9 +50,9 @@ if settings.INPUT.num_freqs >= 3
     % between second and third frequency
     HMW23_epoch = (f2.*L2-f3.*L3) ./ (f2-f3) - ...
         (f2.*C2+f3.*C3) ./ (f2+f3);
-    HMW_23(q,sats) = HMW23_epoch .* ((f2-f3)./Const.C); % convert to [cyc] and save
+    Adjust.HMW_23(q,sats) = HMW23_epoch .* ((f2-f3)./Const.C); % convert to [cyc] and save
     % between first and third frequency
     HMW13_epoch = (f1.*L1-f3.*L3) ./ (f1-f3) - ...
         (f1.*C1+f3.*C3) ./ (f1+f3);
-    HMW_13(q,sats) = HMW13_epoch .* ((f1-f3)./Const.C); % convert to [cyc] and save
+    Adjust.HMW_13(q,sats) = HMW13_epoch .* ((f1-f3)./Const.C); % convert to [cyc] and save
 end

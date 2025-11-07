@@ -11,6 +11,12 @@ function model = init_struct_model(m, n, k)
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
+model.first_call = true;
+
+model.sunECEF = [0; 0; 0];      % approximate sun position
+model.moonECEF = [0; 0; 0];     % approximate moon position
+
+model.R_LL2ECEF = zeros(3);     % rotation matrix from Local Level to ECEF
 
 model.rho   = NaN(m,n);         % Theoretical range
 model.dT_sat = NaN(m,n);        % Satellite clock correction
@@ -39,8 +45,9 @@ model.mfw  = NaN(m,n);          % Wet tropo mapping function
 model.zwd  = NaN(m,n);          % zenith wet delay (need for building a priori + estimated zwd later)
 model.zhd  = NaN(m,n);			% zenith hydrostatic delay
 
-model.az = NaN(m,n);            % Satellite azimuth
-model.el = NaN(m,n);            % Satellite elevation
+model.az = NaN(m,n);            % Satellites' azimuth
+model.el = NaN(m,n);            % Satellites' elevation
+model.bore = NaN(m,n);          % Satellites' boresight angle
 
 model.ECEF_X = NaN(3,m);        % Sat Position before rotation
 model.ECEF_V = NaN(3,m);        % Sat Velocity before rotation
@@ -63,3 +70,7 @@ model.dX_PCV_rec_corr  = NaN(m,n); 		% Receiver Antenna Phase Center Variation c
 model.dX_ARP_ECEF_corr = NaN(m,n);      % Receiver Antenna Reference Point correction
 model.dX_PCO_sat_corr  = NaN(m,n); 		% Satellite Antenna Phase Center Offset correction
 model.dX_PCV_sat_corr  = NaN(m,n); 		% Satellite Antenna Phase Center Variation correction
+
+model.model_code    = NaN(m,n);     % modeled code observations
+model.model_phase   = NaN(m,n);     % modeled phase observations
+model.model_doppler = NaN(m,n);     % modeled Doppler observations

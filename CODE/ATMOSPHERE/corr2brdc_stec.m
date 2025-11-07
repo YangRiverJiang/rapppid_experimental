@@ -11,7 +11,7 @@ function [stec] = corr2brdc_stec(corr_vtec, az, elev, pos_geo, Ttr)
 %   az          azimut [°]
 %   elev        elevation [°]
 %   pos_geo     struct, ph = latitude [rad], la = longitude [rad], h = height [m]
-%   t           GPS time of computation epoch [sod]
+%   Ttr         GPS time of computation epoch [sod]
 % OUTPUT:
 %   stec        Slant Total Electron Content [TECU]
 % 
@@ -73,7 +73,7 @@ lon_S = mod(lon_IPP + (t-50400)*pi/43200, 2*pi);       % (2)
 
 %% calculate VTEC with spherical harmonics with (1)
 [N,M] = size(C_nm);         % degree N and order M
-mmm = zeros(N,M) + 0:M - 1;
+mmm = repmat(0:M - 1, N, 1);
 cosine = C_nm .* cos(mmm.*lon_S);
 sine   = S_nm .* sin(mmm.*lon_S);
 P_nm = legendre_Pnm(N, M, lat_IPP);

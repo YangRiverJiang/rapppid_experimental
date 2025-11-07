@@ -78,14 +78,11 @@ for j = 1:n_labels
         
         %% loop over files of current station of current label
         for ii = 1:n_files
-            
-            try         % load variables of current processing
-                fpath = GetFullPath([paths{ii} 'data4plot.mat']);
-                load(fpath, 'storeData', 'obs');    %  variables not used: 'satellites', 'settings', 'model_save'
-            catch
-                errordlg({['Loading File #' sprintf('%d',ii) ' of ' ], [curr_stat ' failed!']}, 'Error')
-                continue
-            end
+
+            % load variables of current processing
+            [storeData, obs, success] = LoadResults(paths{ii}, ii, curr_stat);
+            if ~success; continue; end
+
             % get position data
             [pos_3D, pos_UTM] = getPositionData(storeData, obs, curr_stat, PlotStruct);
             % get true position
@@ -95,7 +92,7 @@ for j = 1:n_labels
             dE = pos_UTM(:,2) - East_true;
             dH = pos_UTM(:,3) - pos_geo_true.h;
             % get troposphere estimation and calculate difference to IGS
-            dZTD = []; if PlotStruct.tropo; dZTD = TropoDifference(storeData, obs); end
+            dZTD = []; if PlotStruct.tropo; dZTD = TropoDifference(storeData, obs, PlotStruct); end
             
             reset_epochs = storeData.float_reset_epochs;    % epochs where solution was resetted during processing
             no_epochs = numel(storeData.float);             % number of epochs of current processing
@@ -301,6 +298,7 @@ title('Station 3D Accuracy Graph')
 bool_ztd_graph = any(~isnan(P41(:))) && PlotStruct.tropo;
 if bool_ztd_graph
     str = 'Station ZTD Accuracy, float solution';
+    if PlotStruct.fixed ; str = 'Station ZTD Accuracy, fixed solution'; end
     %     if PlotStruct.fixed ; str = 'Station Graph Accuracy, fixed solution'; end
     fig_stat_ztd = figure('Name',str, 'NumberTitle','off');
     subplot(2,1,1)

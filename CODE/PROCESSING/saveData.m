@@ -1,5 +1,5 @@
 function [satellites, storeData, model_save] = ...
-    saveData(Epoch, q, satellites, storeData, settings, Adjust, model, model_save, HMW_12, HMW_23, HMW_13)
+    saveData(Epoch, q, satellites, storeData, settings, Adjust, model, model_save)
 % This function saves the data of the current epoch into satellites,
 % storeData or model_save before the next epoch of the epoch-wise 
 % processing is started (and the variables reset) to keep the data for e.g.
@@ -14,7 +14,6 @@ function [satellites, storeData, model_save] = ...
 %   Adjust          struct, contains adjustment-specific data
 %   model           struct, contains all modeled error-sources
 %   model_save      struct, collects all modeled errors from model
-%	HMW_12,...      matrix, Hatch-Melbourne-Wübbena LC observables
 % OUTPUT:
 %   satellites, storeData, model_save
 %                   updated with data of the current epoch
@@ -40,6 +39,9 @@ decoupled_clock_model = strcmp(settings.IONO.model, 'Estimate, decoupled clock')
 satellites.obs(q,prns)  = Epoch.tracked(prns);  	% save number of epochs satellite is tracked
 satellites.elev(q,prns) = model.el(:,1);	% save elevation of satellites
 satellites.az  (q,prns) = model.az(:,1); 	% save azimuth [°] of satellites
+if settings.ADJ.satellite.bool
+	satellites.bore(q,prns) = model.bore; 	% save boresight angle [°] of satellites
+end
 
 % Save Carrier-to-Noise density
 if ~isempty(Epoch.S1)
@@ -181,9 +183,21 @@ if settings.OTHER.CS.Doppler  && strcmpi(settings.PROC.method,'Code + Phase') &&
     storeData.cs_L2D2_diff(q,prns)   = Epoch.cs_L2D2_diff(prns);
     storeData.cs_L3D3_diff(q,prns)   = Epoch.cs_L3D3_diff(prns);
 end
-if settings.OTHER.CS.TimeDifference
-    L_diff_n = diff(Epoch.cs_phase_obs(:,Epoch.sats), settings.OTHER.CS.TD_degree, 1);
-    storeData.cs_L1_diff(q,prns) = L_diff_n;
+if settings.OTHER.CS.TimeDifference     % time difference
+    storeData.cs_L1_diff(q,prns) = Epoch.cs_L1_diff;
+end
+if settings.OTHER.CS.HMW && strcmpi(settings.PROC.method,'Code + Phase') && ~isempty(Epoch.old.cs_HMW)
+    % calculate difference between average and current value of WL
+    % ambiguity and save (WL ambiguity difference and variance)
+    WL_diff = abs(Epoch.cs_HMW - Epoch.old.cs_HMW_av(:,prns));  
+    storeData.cs_WL_12_diff(q,prns) = WL_diff(1, :);
+    storeData.cs_var_12(q,prns)    = Epoch.cs_HMW_var(1, prns);
+    if settings.INPUT.num_freqs > 2
+        storeData.cs_WL_13_diff(q,prns) = WL_diff(2, :);
+        storeData.cs_var_13(q,prns)    = Epoch.cs_HMW_var(2, prns);
+        storeData.cs_WL_23_diff(q,prns) = WL_diff(3, :);
+        storeData.cs_var_23(q,prns)    = Epoch.cs_HMW_var(3, prns);
+    end
 end
 
 
@@ -227,10 +241,10 @@ if settings.AMBFIX.bool_AMBFIX
         storeData.iono_fixed(q,prns) = Adjust.iono_fix;   % fixed ionospheric delay estimation
     end
     % save Hatch-Melbourne-Wübbena LCs
-    storeData.HMW_12(q,prns) = HMW_12(q,prns);
+    storeData.HMW_12(q,prns) = Adjust.HMW_12(q,prns);
     if proc_frqs >= 2
-        storeData.HMW_23(q,prns) = HMW_23(q,prns);
-        storeData.HMW_13(q,prns) = HMW_13(q,prns);
+        storeData.HMW_23(q,prns) = Adjust.HMW_23(q,prns);
+        storeData.HMW_13(q,prns) = Adjust.HMW_13(q,prns);
     end
 end
 
@@ -271,6 +285,7 @@ end
 
 %% save resulting time series of position and clock correction over epochs
 storeData.gpstime(q,1) = Epoch.gps_time;
+storeData.time(q,1) = Epoch.time;
 storeData.dt_last_reset(q) = Epoch.gps_time-Adjust.reset_time;      % [s], time since last reset
 storeData.param(q,:) = Adjust.param(1:NO_PARAM);
 

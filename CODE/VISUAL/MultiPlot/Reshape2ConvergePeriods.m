@@ -52,7 +52,7 @@ if eps_reset*no_resets == no_epochs && no_resets~=1 && eps_reset == size(d.dT,2)
         d.FIXED = [ d.FIXED; reshape(storeData.fixed, eps_reset, no_resets)'];
     end
     
-elseif no_resets==1
+elseif no_resets == 1
     d.dT  (end+1,1:no_epochs) = storeData.dt_last_reset;
     d.Time(end+1,1:no_epochs) = storeData.gpstime;
     d.N( end+1,1:no_epochs) = dN;

@@ -39,10 +39,12 @@ RMS_z = calculate_rms(dz);
 isnan_x = isnan(dx); isnan_dy = isnan(dx); isnan_dz = isnan(dx);
 dx(isnan_x) = 0;     dy(isnan_dy) = 0;     dz(isnan_dz) = 0;
 
+% remove suspicious data
+bool_0 = seconds(2:end) == 0;       % always true for seconds(1)
+bool = isnan(seconds) | [false; bool_0];    % remove suspicious data, but keep first epoch
+dx(bool) = []; dy(bool) = []; dz(bool) = [];
+
 % plot
-ind = find(seconds==0 | isnan(seconds));        % remove suspicious data
-seconds(ind) = [];
-dx(ind) = []; dy(ind) = []; dz(ind) = [];
 fig_3coord = figure('Name','XYZ Plot', 'NumberTitle','off');
 hold on
 plot(seconds,dz, 'color', [0.4660 0.6740 0.1880], 'LineWidth', 1);

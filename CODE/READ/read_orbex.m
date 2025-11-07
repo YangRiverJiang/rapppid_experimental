@@ -8,7 +8,7 @@ function OBX = read_orbex(obx_filepath)
 %                   fields for each record type
 %
 % Revision:
-%   ...
+%   2025/08/14, MFWG: switch to cal2gpstime
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -88,10 +88,7 @@ for i = i_header:n
         i_rec = i_rec + 1;                  % increase number of record
         date = sscanf(line(4:end),'%f');    % year, month, day, hour, min, sec, number of entries
         % convert date into gps-time [sow]
-        h = date(4) + date(5)/60 + date(6)/3600;            % fractional hour
-        jd = cal2jd_GT(date(1), date(2), date(3) + h/24);   % Julian date
-        [~, gps_time,~] = jd2gps_GT(jd);                    % gps-time [sow]
-        gps_time = double(gps_time);
+        [~, gps_time] = cal2gpstime(date(1:6)');
         continue
     end
 

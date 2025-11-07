@@ -1,11 +1,18 @@
-function [settings, Epoch, Adjust, storeData, HMW_12, HMW_23, HMW_13] = ...
-    ExcludeEpoch(settings, Epoch, Adjust, storeData, HMW_12, HMW_23, HMW_13, bool_print)
+function [settings, Epoch, Adjust, storeData] = ...
+    ExcludeEpoch(settings, Epoch, Adjust, storeData, bool_print)
 % Function to jump over epochs excluded in the GUI
 %
 % INPUT:
-%   ...
+%   settings        struct, processing settings (from GUI)
+%   Epoch           struct, epoch-specific variables
+%   Adjust          struct, variables relevant for parameter estimation
+%   storeData       struct, struct, stores data of whole processing
+%   bool_print      boolean, true to print to command window
 % OUTPUT:
-%	...
+%   settings        struct, processing settings (from GUI)
+%   Epoch           struct, epoch-specific variables
+%   Adjust          struct, variables relevant for parameter estimation
+%   storeData       struct, struct, stores data of whole processing
 %
 % Revision:
 %   ...
@@ -49,11 +56,10 @@ if any(q == settings.PROC.excl_epochs_reset)
 		% reset reference satellites
         Epoch.refSatGPS = 0; Epoch.refSatGLO = 0; Epoch.refSatGAL = 0; Epoch.refSatBDS = 0; Epoch.refSatQZS = 0;
         Epoch.refSatGPS_idx = []; Epoch.refSatGLO_idx = []; Epoch.refSatGAL_idx = []; Epoch.refSatBDS_idx = []; Epoch.refSatQZS_idx = [];
-        % restart fixing in [GUI-definded] epochs
-        settings.AMBFIX.start_fixing(end+1, :) = ...    % -1 as we are already in epoch where reset is happening
-            [q+settings.AMBFIX.start_WL-1, q+settings.AMBFIX.start_NL-1];
         % reset Hatch-Melboure-Wübbena LCs (ATTENTION: values of MW are overwritten!)
-        HMW_12(1:q,:) = 0; HMW_23(1:q,:) = 0; HMW_13(1:q,:) = 0;
+        Adjust.HMW_12(1:q,:) = 0; 
+        Adjust.HMW_23(1:q,:) = 0; 
+        Adjust.HMW_13(1:q,:) = 0;
         % create new entry in time to first fix
         storeData.ttff(end+1) = NaN;
     end

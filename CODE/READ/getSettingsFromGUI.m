@@ -271,10 +271,14 @@ settings.OTHER.CS.DF_threshold = str2double( get(handles.edit_CycleSlip_DF_thres
 % cycle-slip detector Doppler-Shift
 settings.OTHER.CS.Doppler = get(handles.checkbox_CycleSlip_Doppler, 'Value');
 settings.OTHER.CS.D_threshold = str2double(get(handles.edit_CycleSlip_Doppler_threshold, 'String'));
-% cycle-slip detector time differende
+% cycle-slip detector time difference
 settings.OTHER.CS.TimeDifference = get(handles.checkbox_cs_td, 'Value');
 settings.OTHER.CS.TD_threshold = str2double(get(handles.edit_cs_td_thresh, 'String'));
 settings.OTHER.CS.TD_degree = str2double(get(handles.edit_cs_td_degree, 'String'));
+% cycle-slip detector HMW LC
+settings.OTHER.CS.HMW = get(handles.checkbox_cs_HMW, 'Value');
+settings.OTHER.CS.HMW_threshold = str2double(get(handles.edit_cs_HMW_thresh, 'String'));
+settings.OTHER.CS.HMW_factor = str2double(get(handles.edit_cs_HMW_factor, 'String'));
 % check RINEX Loss of Lock Index (LLI)
 settings.PROC.LLI = handles.checkbox_LLI.Value;
 % multipath detection
@@ -441,10 +445,12 @@ settings.ADJ.filter.dynmodel_iono = get(handles.popupmenu_filter_iono_dynmodel, 
 
 % Satellite PPP
 settings.ADJ.satellite.bool  = get(handles.checkbox_satellite, 'Value');
+settings.ADJ.satellite.ID    = get(handles.edit_sat_id, 'String');
 settings.ADJ.satellite.mass  = str2double(get(handles.edit_sat_mass, 'String'));
 settings.ADJ.satellite.area  = str2double(get(handles.edit_sat_area, 'String'));
 settings.ADJ.satellite.drag  = str2double(get(handles.edit_sat_drag, 'String'));
 settings.ADJ.satellite.solar = str2double(get(handles.edit_sat_solar, 'String'));
+settings.ADJ.satellite.orient_mode = handles.uibuttongroup_orientation_mode.SelectedObject.String;
 
 
 %% Estimation - Weighting
@@ -467,6 +473,7 @@ settings.ADJ.weight_mplc  	 = get(handles.radiobutton_MPLC_Dependency, 'Value');
 settings.ADJ.weight_sign_str = get(handles.radiobutton_Signal_Strength_Dependency, 'Value');
 settings.ADJ.snr_weight_fun = ...  % get snr function string and convert to function handle
     SNRWeightingFunction(get(handles.edit_snr_weighting_function, 'String'));
+settings.ADJ.weight_bore     = get(handles.radiobutton_Bore_Dependency, 'Value');
 settings.ADJ.weight_none     = get(handles.radiobutton_No_Dependency, 'Value');
 
 % GNSS weighting
@@ -573,15 +580,16 @@ settings = readExcludeSatellites(settings);
 
 % output
 settings.EXP.data4plot      = handles.checkbox_exp_data4plot.Value;
-settings.EXP.results_float  = handles.checkbox_exp_results_float.Value;
+settings.EXP.results_txt    = handles.checkbox_exp_results_txt.Value;
+settings.EXP.results_csv    = handles.checkbox_exp_results_csv.Value;
 settings.EXP.epoch_decimals = handles.edit_exp_digits_time.String;
-settings.EXP.results_fixed  = handles.checkbox_exp_results_fixed.Value;
 settings.EXP.settings       = handles.checkbox_exp_settings.Value;
 settings.EXP.settings_summary = handles.checkbox_exp_settings_summary.Value;
-settings.EXP.model_save = handles.checkbox_exp_model_save.Value;
-settings.EXP.tropo_est = handles.checkbox_exp_tropo_zpd.Value;
-settings.EXP.nmea = handles.checkbox_exp_nmea.Value;
-settings.EXP.kml = handles.checkbox_exp_kml.Value;
+settings.EXP.model_save     = handles.checkbox_exp_model_save.Value;
+settings.EXP.tropo_est      = handles.checkbox_exp_tropo_zpd.Value;
+settings.EXP.nmea           = handles.checkbox_exp_nmea.Value;
+settings.EXP.kml            = handles.checkbox_exp_kml.Value;
+settings.EXP.sp3            = handles.checkbox_exp_sp3.Value;
 % Variable obs
 settings.EXP.obs_bias        = handles.checkbox_exp_obs_bias.Value;
 settings.EXP.obs_epochheader = handles.checkbox_exp_obs_epochheader.Value;

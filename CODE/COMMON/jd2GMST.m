@@ -21,6 +21,7 @@ function GMST = jd2GMST(jd)
 % find the Julian Date of the previous midnight, jd0
 jd_min = floor(jd) - 0.5;
 jd_max = floor(jd) + 0.5;
+jd0 = zeros(size(jd));
 jd0(jd > jd_min) = jd_min(jd > jd_min);
 jd0(jd > jd_max) = jd_max(jd > jd_max);
 

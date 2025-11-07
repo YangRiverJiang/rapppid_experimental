@@ -51,6 +51,7 @@ N_idx = (NO_PARAM+1):(NO_PARAM+s_f);  	% indices of the ambiguities
 %% parameter vector
 param_vec = zeros(NO_PARAM + no_ambig + no_sats, 1);    % 22 + #ambiguities + #ionospheric delays
 param_vec(1:3,1) = settings.INPUT.pos_approx;           % approximate position (X,Y,Z)
+param_pred = param_vec;         % no prediction in first epoch
 % other parameters don´t have approximate values so they are zero
 
 
@@ -197,7 +198,7 @@ end
 
 % --- parameter vector ---
 Adjust.param = param_vec;
-Adjust.param_pred = param_vec;      	% no prediction in first epoch
+Adjust.param_pred = param_pred;
 
 % --- covariance matrix ---
 Adjust.param_sigma = param_sigma;

@@ -17,7 +17,11 @@ function [] = vis_plot_ttff(TTCF, labels, coleurs)
 
 
 %% Preparations
-min_end = 15;                           % plot goes until minute 15 
+
+% determine end of plot (time)
+min_end = ceil(max(cell2mat(TTCF))) + 1;    % last fix + 1min
+min_end = min([min_end, 15]);               % plot not longer than 15min 
+
 min_str = sprintf('%.0f', min_end);     % string for titles
 n = numel(labels);                      % number of labels
 fig = figure('Name', 'Histograms of First Fix', 'NumberTitle','off');
@@ -25,6 +29,8 @@ fig = figure('Name', 'Histograms of First Fix', 'NumberTitle','off');
 % edges = 0 : 1/12 : min_end;          % every 5 seconds
 edges = 0: 1/4  : min_end;          % every 15 seconds
 % edges = 0 : 0.5 : min_end;          % every 30 seconds
+
+
 
 
 %% Plot Acumulated Time to Correct Fix

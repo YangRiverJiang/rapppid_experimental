@@ -36,9 +36,10 @@ if settings.INPUT.bool_realtime || ...
         settings.PROC.timeFrame(2) - settings.PROC.timeFrame(1) > q)
     eps = 1:q;      % vector of processed epochs
     % satellites
+	satellites.obs = satellites.obs(eps,:);
     satellites.elev = satellites.elev(eps,:);
     satellites.az = satellites.az(eps,:);
-    satellites.obs = satellites.obs(eps,:);
+    if settings.ADJ.satellite.bool; satellites.bore = satellites.bore(eps,:); end
     satellites.SNR_1 = satellites.SNR_1(eps,:);
     if num_freqs > 1; satellites.SNR_2 = satellites.SNR_2(eps,:); end
     if num_freqs > 2; satellites.SNR_3 = satellites.SNR_3(eps,:); end
@@ -53,6 +54,7 @@ if settings.INPUT.bool_realtime || ...
     storeData.param             = storeData.param(eps,:);
     storeData.param_sigma       = storeData.param_sigma(eps);   % cell
     storeData.gpstime           = storeData.gpstime(eps);
+	storeData.time           	= storeData.time(eps);
 	storeData.dt_last_reset     = storeData.dt_last_reset(eps);
     storeData.param_var         = storeData.param_var(eps,:);
     storeData.N_var_1           = storeData.N_var_1(eps,:);
@@ -153,6 +155,16 @@ if settings.INPUT.bool_realtime || ...
     end
     if settings.OTHER.CS.TimeDifference     % time difference
         storeData.cs_L1_diff	= storeData.cs_L1_diff(eps,:);
+    end
+    if settings.OTHER.CS.HMW                % HMW LC
+        storeData.cs_WL_12_diff = storeData.cs_WL_12_diff(eps,:);
+        storeData.cs_var_12    = storeData.cs_var_12(eps,:);
+        if settings.INPUT.num_freqs > 2
+            storeData.cs_WL_13_diff = storeData.cs_WL_13_diff(eps,:);
+            storeData.cs_var_13    = storeData.cs_var_13(eps,:);
+            storeData.cs_WL_23_diff = storeData.cs_WL_23_diff(eps,:);
+            storeData.cs_var_23    = storeData.cs_var_23(eps,:);
+        end
     end
     
     % multipath detection

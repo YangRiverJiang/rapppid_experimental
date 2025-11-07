@@ -179,18 +179,18 @@ end
 if any(any(new_cs))
     % put detected cycle slips into Epoch
     Epoch.cs_found = Epoch.cs_found | new_cs;
-%     % print information of detected cycle slips
-%     if ~settings.INPUT.bool_parfor
-%         if any(cs_found_L1)
-%             printCSinfo(cs_found_L1, Epoch, diff_12, diff_13, 'L1', 'dL1L2', 'dL1L3')
-%         end
-%         if any(cs_found_L2) && num_freq > 1
-%             printCSinfo(cs_found_L2, Epoch, diff_12, diff_23, 'L2', 'dL1L2', 'dL2L3')
-%         end
-%         if any(cs_found_L3) && num_freq > 2
-%             printCSinfo(cs_found_L3, Epoch, diff_13, diff_23, 'L3', 'dL1L3', 'dL2L3')
-%         end
-%     end
+    % % print information of detected cycle slips
+    % if ~settings.INPUT.bool_parfor
+    %     if any(cs_found_L1)
+    %         printCSinfo(cs_found_L1, Epoch, diff_12, diff_13, 'L1', 'dL1L2', 'dL1L3')
+    %     end
+    %     if any(cs_found_L2) && proc_freq > 1
+    %         printCSinfo(cs_found_L2, Epoch, diff_12, diff_23, 'L2', 'dL1L2', 'dL2L3')
+    %     end
+    %     if any(cs_found_L3) && proc_freq > 2
+    %         printCSinfo(cs_found_L3, Epoch, diff_13, diff_23, 'L3', 'dL1L3', 'dL2L3')
+    %     end
+    % end
 end
 
 end
@@ -203,15 +203,16 @@ function [L_now, L_old] = ...
     l_gps, l_glo, l_gal, l_bds, l_qzss, ...
     gps_now, gps_old, glo_now, glo_old, gal_now, gal_old, bds_now, bds_old, qzss_now, qzss_old, ...
     w_now_gps, w_old_gps, w_now_glo, w_old_glo, w_now_gal, w_old_gal, w_now_bds, w_old_bds, w_now_qzss, w_old_qzss)
-% Get phase observation for GPS and Galileo for current and last epoch
+% Get phase observation for GPS, GLONASS, Galileo, BeiDou, and QZSS for 
+% current and last epoch.
 % INPUT: 
 %   obs_now_gps/glo/gal/bds/qzss     observation matrix of current epoch
 %   obs_old_gps/glo/gal/bds/qzss     observation matrix of last epoch
 %   l_gps/glo/gal/bds/qzss           column of phase observations
-%   gps/glo/gal/bds/qzss_now         galileo and gps satellites of current epoch
-%   gps/glo/gal/bds/qzss_old         galileo and gps satellites of last epoch
-%   w_now_gps/glo/gal/bds/qzss       wavelength of gps/galileo satellites of current epoch
-%   w_old_gps/glo/gal/bds/qzss       wavelength of gps/galileo satellites of last epoch
+%   gps/glo/gal/bds/qzss_now         GPS/... satellites of current epoch
+%   gps/glo/gal/bds/qzss_old         GPS/... satellites of last epoch
+%   w_now_gps/glo/gal/bds/qzss       wavelength of GPS/... satellites of current epoch
+%   w_old_gps/glo/gal/bds/qzss       wavelength of GPS/... satellites of last epoch
 % OUTPUT:
 %   L_now                   phase observation for all GNSS of current epoch
 %   L_old                   phase observation for all GNSS of last epoch

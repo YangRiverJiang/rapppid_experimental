@@ -7,7 +7,7 @@ function [Epoch, Adjust, model] = calc_float_solution(input, obs, Adjust, Epoch,
 %	obs			consisting observations and corresponding data [struct]
 %	Adjust      containing all adjustment relevant data and matrices from previous epoch [struct]  
 % 	Epoch       epoch-specific data for current epoch [struct] 
-%	settings    settings from GUI [struct]                 
+%	settings    settings from GUI [struct]      
 % OUTPUT:
 %	Epoch       updated epoch-specific data for current epoch [struct] 
 %	Adjust      [struct] containing all adjustment relevant data and matrices
@@ -26,33 +26,50 @@ function [Epoch, Adjust, model] = calc_float_solution(input, obs, Adjust, Epoch,
 bool_print = ~settings.INPUT.bool_parfor;   % print to command window?
 num_freq = settings.INPUT.proc_freqs;	% number of processed frequencies
 NO_PARAM = Adjust.NO_PARAM;				% number of estimated parameters
-model = [];                          	% Initialize struct model
 no_sats = numel(Epoch.sats);            % total number of satellites in current epoch
-it = 0; 	% number of current iteration
 filter_type = settings.ADJ.filter.type; % method of parameter estimation
+dx.x = zeros(size(Adjust.param));       % initialize
+it = 0; 	                            % number of current iteration
 
-% check if approximate position is available
+% Initialize struct model
+model = init_struct_model(no_sats, settings.INPUT.proc_freqs, settings.INPUT.num_freqs);
+
+% check if approximate position exists
 if ~Adjust.float && any(Adjust.param(1:3) == 0 | isnan(Adjust.param(1:3)) | any(Adjust.param(1:3) == 1))
-    % calculate an approximate position (if not known in 1st epoch or 
-    % somehow completely lost during processing) before Kalman Filtering
-    % xyz_approx = ApproximatePositionFromSats(Epoch, input, settings);     % slow alternative  
+    % calculate an approximate position (e.g., not known in 1st epoch)
     xyz_approx = ApproximatePosition(Epoch, input, obs, settings);
     Adjust.param(1:3) = xyz_approx;
     if any(Adjust.param_pred(1:3) == 0 | isnan(Adjust.param_pred(1:3)) | any(Adjust.param_pred(1:3) == 1))
-        % most likely no position prediction was possible without an 
-        % approximate position, so just take approximate position
-        Adjust.param_pred(1:3) = xyz_approx;
+        Adjust.param_pred(1:3) = xyz_approx;    % just take approximate position as predictio
     end
 end
 
+% make sure that Kalman Filter has good approximate initial parameters (e.g., huge receiver clock error)
+if ~Adjust.float && strcmp(filter_type, 'Kalman Filter') && ~settings.ADJ.satellite.bool
+    % prepare and perform LSQ adjustment with calc_float_solution
+    LSQ_setts = settings;
+    LSQ_setts.ADJ.filter.type = 'No Filter';
+    LSQ_setts.INPUT.bool_parfor = true;     % to avoid output to the command window
+    [~, LSQ, ~] = calc_float_solution(input, obs, Adjust, Epoch, LSQ_setts);
+    % replace initial approximate values of parameters with results of LSQ
+    Adjust.param(1:NO_PARAM) = LSQ.param(1:NO_PARAM);
+    Adjust.param_pred(1:NO_PARAM) = LSQ.param(1:NO_PARAM);
+    % residual ZWD is expected to be zero 
+    bool_zwd = strcmp(Adjust.ORDER_PARAM, 'zwd');
+    Adjust.param(bool_zwd) = 0;
+    Adjust.param_pred(bool_zwd) = 0;
+end
 
-while it < DEF.ITERATION_MAX_NUMBER    	% Start iteration (because of linearization)
+
+
+% Start iteration (because of linearization)
+while it < DEF.ITERATION_MAX_NUMBER    	
     it = it + 1;
 
     % --- model the observations of current epoch, IMPORTANT FUNCTION!
     % if first iteration OR 2nd iteration if coordinate or clock jump occur
     coord_jump = it >= 2 && norm(dx.x(1:3)) > 0.05;
-    clock_jump = it >= 2 && ReceiverClockJump(dx.x, settings.IONO.model);
+    clock_jump = it >= 2 && MajorReceiverClockChange(dx.x, settings.IONO.model);
     if it == 1 || coord_jump || clock_jump
         [model, Epoch] = modelErrorSources(settings, input, Epoch, model, Adjust, obs);
     end
@@ -92,6 +109,7 @@ while it < DEF.ITERATION_MAX_NUMBER    	% Start iteration (because of linearizat
             if ~strcmp(settings.IONO.model, 'Estimate, decoupled clock')
                 Adjust = Designmatrix_ZD(Adjust, Epoch, model, settings);
             else
+                Epoch.fixable = CheckSatellitesFixable(Epoch, settings, model, input);
                 [Epoch, Adjust] = handleRefSats(Epoch, model.el, settings, Adjust);
                 Adjust = Designmatrix_DCM(Adjust, Epoch, model, settings);
             end
@@ -102,11 +120,11 @@ while it < DEF.ITERATION_MAX_NUMBER    	% Start iteration (because of linearizat
         case 'Doppler'
             Adjust = Designmatrix_doppler_ZD(Adjust, Epoch, model, settings);            
         otherwise
-            errordlg('Check Processing Method!', 'Error')
+            fprintf(2, '\nCheck Processing Method!\n')
     end     
     
     % --- create covariance matrix of observations
-    Adjust = createObsCovariance(Adjust, Epoch, settings, model.el);
+    Adjust = createObsCovariance(Adjust, Epoch, settings, model.el, model.bore);
     
     % --- check if too many observations have been excluded because of e.g. 
     % elevation cutoff, check_omc, missing broadcast corrections...
@@ -135,13 +153,14 @@ while it < DEF.ITERATION_MAX_NUMBER    	% Start iteration (because of linearizat
                 break;
             else        % inner-epoch iteration continues
                 Adjust.param = Adjust.param + dx.x;
-                % replace prediction with current values
+                % replace prediction with current values (used in modelErrorSources in next iteration)
                 Adjust.param_pred = Adjust.param;
                 Adjust.param_sigma_pred = Adjust.param_sigma;
             end
 
         case 'Kalman Filter'
-            Adjust = KalmanFilter(Adjust);
+            [Adjust.param, Adjust.param_sigma, Adjust.float] = ...
+                KalmanFilter(Adjust.omc, Adjust.A, Adjust.param_pred, Adjust.param_sigma_pred, Adjust.Q);
             Adjust.res = calc_res(settings, input, Epoch, model, Adjust, obs);
             break;              % no inner-epoch iteration
             
@@ -152,6 +171,9 @@ while it < DEF.ITERATION_MAX_NUMBER    	% Start iteration (because of linearizat
                 break;
             else        % inner-epoch iteration continues
                 Adjust.param   = Adjust.param + dx.x;
+                % replace prediction with current values (used in modelErrorSources in next iteration)
+                Adjust.param_pred = Adjust.param;
+                Adjust.param_sigma_pred = Adjust.param_sigma;                
             end
     end
     
@@ -202,16 +224,14 @@ end
 
 %% AUXILIARY FUNCTIONS
 
-function bool = ReceiverClockJump(dx, iono_model)
-% determine change of receiver clock error in the last iteration
-if ~strcmp(iono_model, 'Estimate, decoupled clock')
-    sum_rec_clk = dx(8) + dx(11) + dx(14) + dx(17) + dx(20);
-else
-    sum_rec_clk = dx(7) + dx( 8) + dx( 9) + dx(10) + dx(11);
+function bool = MajorReceiverClockChange(dx, iono_model)
+% check for major change of receiver clock error estimation in the last iteration
+sum_rec_clk = dx(8) + dx(11) + dx(14) + dx(17) + dx(20);
+if strcmp(iono_model, 'Estimate, decoupled clock')
+    sum_rec_clk = dx(8) + dx( 9) + dx(10) + dx(11) + dx(12);
 end
-% check for jump
-bool = false; 
-if sum_rec_clk > 1000;      bool = true;        end
+% check for major change
+bool = abs(sum_rec_clk) > DEF.REC_CLOCK_CHANGE_THRESHOLD;
 
 
 
@@ -250,6 +270,7 @@ exclude = Epoch.exclude(:);
 usePhase = ~Epoch.cs_found(:);
 if strcmpi(settings.PROC.method, 'Code + Phase')
     s_f = numel(Epoch.sats) * settings.INPUT.proc_freqs;    % #sats x # freqs
+    res = zeros(s_f, 1);
     code_row = 1:2:2*s_f;   	% rows for code  obs [1,3,5,7,...]
     phase_row = 2:2:2*s_f;  	% rows for phase obs [2,4,6,8,...]
     res(code_row,:)	 = (Epoch.code(:)  - code_model(:))  .*  ~exclude; 	% for code-observations

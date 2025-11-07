@@ -17,7 +17,7 @@ function [Epoch] = RawSensor2Epoch(RAW, epochheader, q, raw_variables, Epoch, se
 %	Epoch           updated with data of currently processed epoch
 %
 % Revision:
-%   ...
+% 2025/08/14, MFWG: switch to cal2gpstime
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -61,18 +61,6 @@ adjust_QZSS_prn = (gnssRaw.ConstellationType == 4) & (gnssRaw.Svid > 100);
 sats(adjust_QZSS_prn) = sats(adjust_QZSS_prn) - 192;
 
 
-% detect the origin of the measurement (GNSS and frequency) using approximate frequency
-isGPS_L1 = (gnssRaw.ConstellationType == 1) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GPS_F1 /1e4));
-isGPS_L5 = (gnssRaw.ConstellationType == 1) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GPS_F5 /1e4));
-isGLO_G1 = (gnssRaw.ConstellationType == 3) & (round(gnssRaw.CarrierFrequencyHz/1e7) == round(Const.GLO_F1 /1e7));
-isGAL_E1 = (gnssRaw.ConstellationType == 6) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GAL_F1 /1e4));
-isGAL_E5a= (gnssRaw.ConstellationType == 6) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GAL_F5a/1e4));
-isBDS_B1 = (gnssRaw.ConstellationType == 5) & (round(gnssRaw.CarrierFrequencyHz/1e3) == round(Const.BDS_F1 /1e3));
-isBDS_B2a= (gnssRaw.ConstellationType == 5) & (round(gnssRaw.CarrierFrequencyHz/1e3) == round(Const.BDS_F2a/1e3));
-isQZS_L1 = (gnssRaw.ConstellationType == 4) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.QZSS_F1/1e4));
-isQZS_L5 = (gnssRaw.ConstellationType == 4) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.QZSS_F5/1e4));
-
-
 %% time and observations
 % -) generate GPS time and week with the measurements of the first GPS satellite
 idx = find(gnssRaw.ConstellationType, 1, 'first');
@@ -81,7 +69,7 @@ idx = find(gnssRaw.ConstellationType, 1, 'first');
 
 
 % -) generate code pseudorange for all satellites
-PR = generateCodePseudorange(gnssRaw, leap_sec, isGPS_L1, isGPS_L5, isGLO_G1, isGAL_E1, isGAL_E5a, isBDS_B1, isBDS_B2a, isQZS_L1, isQZS_L5);
+PR = generateCodePseudorange(gnssRaw, leap_sec);
 % MultipathIndicator:
 % 0 ... presence or absence of multipath is unknown
 % 1 ... multipath detected
@@ -113,15 +101,27 @@ Doppler = -gnssRaw.PseudorangeRateMetersPerSecond;    % [m/s]
 %% save everything into Epoch
 % time variables
 Epoch.gps_time = gpstime;
-Epoch.mjd = gps2jd_GT(gpsweek, gpstime) - 2400000.5;
 Epoch.gps_week = gpsweek;
+Epoch.time = gpstime2cal(gpsweek, gpstime);
+Epoch.mjd = gps2jd_GT(gpsweek, gpstime) - 2400000.5;
 % satellite numbers
 Epoch.sats = unique(sort(sats));
 
+% determine GNSS and frequency using approximate frequency
+isGPS_L1 = (gnssRaw.ConstellationType == 1) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GPS_F1 /1e4));
+isGLO_G1 = (gnssRaw.ConstellationType == 3) & (round(gnssRaw.CarrierFrequencyHz/1e7) == round(Const.GLO_F1 /1e7));
+isGAL_E1 = (gnssRaw.ConstellationType == 6) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GAL_F1 /1e4));
+isBDS_B1 = (gnssRaw.ConstellationType == 5) & (round(gnssRaw.CarrierFrequencyHz/1e3) == round(Const.BDS_F1 /1e3));
+isQZS_L1 = (gnssRaw.ConstellationType == 4) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.QZSS_F1/1e4));
+first_frq = isGPS_L1 | isGLO_G1 | isGAL_E1 | isBDS_B1 | isQZS_L1;
+isGPS_L5 = (gnssRaw.ConstellationType == 1) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GPS_F5 /1e4));
+isGAL_E5a= (gnssRaw.ConstellationType == 6) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GAL_F5a/1e4));
+isBDS_B2a= (gnssRaw.ConstellationType == 5) & (round(gnssRaw.CarrierFrequencyHz/1e3) == round(Const.BDS_F2a/1e3));
+isQZS_L5 = (gnssRaw.ConstellationType == 4) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.QZSS_F5/1e4));
+secnd_frq = isGPS_L5 | isGAL_E5a| isBDS_B2a| isQZS_L5;     % not considered: isGLO_G2
+
 % save observation data into Epoch.obs
 obs = NaN(numel(Epoch.sats),8); Epoch.obs = obs;
-first_frq = isGPS_L1 | isGLO_G1 | isGAL_E1 | isBDS_B1 | isQZS_L1;
-secnd_frq = isGPS_L5 | isGAL_E5a| isBDS_B2a| isQZS_L5;     % not considered: isGLO_G2
 [obs]  = save2obs(obs, 1, Epoch.sats, sats, PR, Phase, SNR, Doppler, first_frq);
 [obs]  = save2obs(obs, 2, Epoch.sats, sats, PR, Phase, SNR, Doppler, secnd_frq);
 % obs is ordered the following at the moment:
@@ -222,15 +222,13 @@ end
 
 function rinex_header = createRinexHeader(gps_week, gps_time, usable, n_sats)
 % create RINEX observation record header (e.g., to simplify comparisons)
-[y, mn, day] = jd2cal_GT(gps2jd_GT(gps_week, gps_time));
-day_frac = mod(day,1);          % day
-h = day_frac*24;                % hour
-m = mod(h,1)*60;                % minute
-s = mod(day_frac*86400,60);     % second
-
-rinex_header = ['> ' sprintf('%4d ', y) sprintf('%02d ', mn) sprintf('%02d ', floor(day)) ...
+caldate = gpstime2cal(gps_week, gps_time);
+y = year(caldate);  mn = month(caldate);    d = day(caldate);
+h = hour(caldate);  m = minute(caldate);    s = second(caldate);
+rinex_header = ['> ' sprintf('%4d ', y) sprintf('%02d ', mn) sprintf('%02d ', floor(d)) ...
     sprintf('%02d ', floor(h)) sprintf('%02d ', floor(m)) sprintf('%02.7f  ', s)...
     sprintf('%1d ', ~usable) sprintf('%2d ', n_sats)];
+
 
 
 

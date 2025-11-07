@@ -1,4 +1,4 @@
-function Adjust = createObsCovariance(Adjust, Epoch, settings, elev)
+function Adjust = createObsCovariance(Adjust, Epoch, settings, elev, bore)
 % This function calculates the covariance matrix / weight matrix of the
 % observations depending on the used PPP model. This is done with a 
 % covariance propagation from the values for the raw code and phase 
@@ -12,6 +12,8 @@ function Adjust = createObsCovariance(Adjust, Epoch, settings, elev)
 %   Adjust      struct, containing adjustment relevant data
 % 	Epoch       struct, epoch-specific data
 %   settings 	settings from GUI
+%   elev        GNSS satellites' elevation angle [°]
+%   bore        boresight angle to GNSS satellites of current epoch [°]
 % OUTPUT:
 %   Adjust      updated with P and Q matrix (weight and covariance matrix)
 %
@@ -36,7 +38,7 @@ C = zeros(n_proc, 3);
 C = kron(eye(2*n), C);
 
 % get weight factors using the weighting function defined in the GUI
-P_fac = createWeights(Epoch, elev, settings);
+P_fac = createWeights(Epoch, elev, settings, bore);
 
 
 %% create covariance matrix for raw observations
@@ -188,8 +190,16 @@ if strcmpi(settings.IONO.model,'Estimate with ... as constraint') && Adjust.cons
     else
         iono_var = v_end;
     end
-    % create covariance and weigth-matrix of ionospheric pseudo-observations
-    P_fac_iono = settings.ADJ.elev_weight_fun(elev*pi/180); 	% ionospheric pseudo-observations are elevation-weighted
+    % create covariance and weigth-matrix of ionospheric
+    % pseudo-observations, which are elevation weighted
+    if isa(settings.ADJ.elev_weight_fun, 'function_handle')
+        P_fac_iono = settings.ADJ.elev_weight_fun(elev*pi/180); 	
+    elseif strcmp(settings.ADJ.elev_weight_fun, 'option_0')
+        P_fac_iono = sin(elev*pi/180).^2;       % option_0 is sin(e)^2
+    else
+        P_fac_iono = sin(elev*pi/180).^2;       % default options is sin(e)^2
+    end
+    P_fac_iono(P_fac_iono==0) = v0;             % elev = 0, avoid Inf -> keep default variance
     Q_iono = diag(iono_var ./ P_fac_iono(:,1));
     % combine to full covariance and weight-matrix
     Q = blkdiag(Q, Q_iono);

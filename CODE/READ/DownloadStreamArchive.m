@@ -23,6 +23,10 @@ function [settings] = DownloadStreamArchive(settings, gpsweek, dow, yyyy, mm, do
 target = [Path.DATA, 'STREAM/', yyyy, '/', doy '/'];
 [~, ~] = mkdir(target);
 
+% files are not small and servers are slow -> increase timeout
+woptions = weboptions;
+woptions.Timeout = 60;      % use 60s (usually 5s is the default value)
+
 switch settings.ORBCLK.CorrectionStream
     
     case 'CNES Archive'

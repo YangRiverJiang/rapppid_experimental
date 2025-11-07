@@ -25,22 +25,12 @@ reset_sow = storeData.gpstime(storeData.float_reset_epochs);
 
 duration = storeData.gpstime(end) - storeData.gpstime(1);     % total time of processing [sec]
 duration = duration/3600;                               % ... [h]
-% determine labelling of x-axis
-if duration < 0.5
-    vec = 0:300:86400;          % 5min-intervall
-elseif duration < 1
-    vec = 0:(3600/4):86400;     % 15min-intervall
-elseif duration < 2
-    vec = 0:(3600/2):86400;     % 30min-intervall
-elseif duration < 4
-    vec = 0:3600:86400;         % 1-h-intervall
-elseif duration < 9
-    vec = 0:(3600*2):86400;   	% 2-h-intervall
-else
-    vec = 0:(3600*4):86400;    	% 4-h-intervall
-end
-ticks = sow2hhmm(vec);
-% Plot the Detection of Cycle-Slips with Single-Frequency-Data
+
+% create ticks
+[vec, ticks] = duration2ticks(duration);
+vec = storeData.gpstime(1) + vec;
+
+% Plot the cycle slip detection
 plotit(storeData.gpstime, storeData.cs_dL1dL2, tresh, vec, ticks,  [' dL1-dL2 ' sys], Elev, mod(reset_sow,86400))
 if isfield(storeData, 'cs_dL1dL3') && ~isempty(storeData.cs_dL1dL3)
     plotit(storeData.gpstime, storeData.cs_dL1dL3, tresh, vec, ticks,  [' dL1-dL3 ' sys], Elev, mod(reset_sow,86400))
@@ -71,7 +61,7 @@ elseif sys(end) == 'J'    	% QZSS
 end
     
 % plot the satellites
-fig1 = figure('Name', ['Cycle Slip Detection dLi-dLj: ' char2gnss(sys)], 'units','normalized', 'outerposition',[0 0 1 1], 'NumberTitle','off');
+fig1 = figure('Name', ['Cycle Slip Detection' sys(1:end-2) ', ' char2gnss(sys(end))], 'units','normalized', 'outerposition',[0 0 1 1], 'NumberTitle','off');
 ii = 1;         % counter of subplot number
 % add customized datatip
 dcm = datacursormode(fig1);
@@ -87,7 +77,7 @@ for i = loop
             set(findall(gcf,'type','text'),'fontSize',8)
             % 16 satellites have been plotted in this window -> it is full
             % -> create new figure
-            fig1 = figure('Name', ['Cycle Slip Detection dLi-dLj: ' char2gnss(sys)], 'units','normalized', 'outerposition',[0 0 1 1], 'NumberTitle','off');
+            fig1 = figure('Name', ['Cycle Slip Detection' sys(1:end-2) ', ' char2gnss(sys(end))], 'units','normalized', 'outerposition',[0 0 1 1], 'NumberTitle','off');
             dcm = datacursormode(fig1);
             datacursormode on
             set(dcm, 'updatefcn', @vis_customdatatip_CycleSlip)
@@ -103,7 +93,7 @@ for i = loop
         hold on
         x_cs = x(cs_idx);
         y_cs = data(cs_idx);
-        plot(x_cs,  y_cs,  'ro')       % highlight cycle-slips
+        plot(x_cs,  y_cs,  'ko')       % highlight cycle-slips
         plot(x,  tresh*ones(1,length(x)), 'g--')    % plot positive threshold
         plot(x, -tresh*ones(1,length(x)), 'g--')    % plot negative threshold
         % Styling
@@ -115,11 +105,10 @@ for i = loop
         ylabel('[m]')
         xlim([min(x(x~=0)) max(x(x~=0))])           % set x-axis
         ylim([-4*tresh, 4*tresh])                   % set y-axis
-        if ~isempty(resets); vline(resets, 'k:'); end	% plot vertical lines for resets
         % find those CS which are outside zoom
         idx = abs(y_cs) > 4*tresh;      
         y = 4*tresh*idx;
-        plot(x_cs(idx),  y(y~=0),  'mo', 'MarkerSize',8)        % highlight CS outside of zoom window
+        plot(x_cs(idx),  y(y~=0),  'ro', 'MarkerSize',8)        % highlight CS outside of zoom window
         hold off
     end
 end

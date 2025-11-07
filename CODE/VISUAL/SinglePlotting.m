@@ -31,6 +31,30 @@ if ~any(storeData.float)
     return          % no float solution in any epoch
 end  
 
+% create storeData.time if not existing (Aug 25, remove in future version)
+if ~isfield(storeData, 'time')
+    storeData.time = gpstime2cal(obs.startGPSWeek, storeData.gpstime);
+end
+
+
+
+% correct time variables for receiver clock error, which was estimated
+% during processing
+if settings.INPUT.use_GPS
+    rec_clk_error = storeData.param(:, 8)/Const.C;
+elseif settings.INPUT.use_GLO
+    rec_clk_error = storeData.param(:, 9)/Const.C;
+elseif settings.INPUT.use_GAL
+    rec_clk_error = storeData.param(:,10)/Const.C;
+elseif settings.INPUT.use_BDS
+    rec_clk_error = storeData.param(:,11)/Const.C;
+elseif settings.INPUT.use_QZSS
+    rec_clk_error = storeData.param(:,12)/Const.C;
+end
+storeData.gpstime = storeData.gpstime - rec_clk_error;
+storeData.time = storeData.time - seconds(rec_clk_error);
+
+
 epochs = 1:numel(storeData.gpstime);       % vector, 1:#epochs
 % true if GNSS was processed and should be plotted 
 isGPS  = settings.INPUT.use_GPS;          
@@ -79,18 +103,18 @@ if isa(settings.PLOT.pos_true, 'double') || ~isfile(settings.PLOT.pos_true)
 else        % reference trajectory
     bool_true_pos = true;
     [pos_true_geo, North_true, East_true] = ...
-        LoadReferenceTrajectory(settings.PLOT.pos_true, obs.leap_sec, storeData.gpstime);
-    if settings.PLOT.coordxyz
+        LoadReferenceTrajectory(settings.PLOT.pos_true, obs.leap_sec, storeData.gpstime, storeData.time);
+    if settings.PLOT.coordxyz || settings.PLOT.XYZ
         [x, y, z] = ell2xyz_GT(pos_true_geo.lat, pos_true_geo.lon, pos_true_geo.h, Const.WGS84_A, Const.WGS84_E_SQUARE);
-        xyz_true = [x, y, z]; 
+        xyz_true = [x, y, z]'; 
     end
 end    
 
 % time-related stuff
 sow = storeData.gpstime;        % time of epochs in seconds of week
 sow = round(10*sow)/10;         % needed if observation in RINEX are not to full second
-seconds = sow - sow(1);
-hours = seconds / 3600;
+secnds = sow - sow(1);
+hours = secnds / 3600;
 interval = storeData.obs_interval;
 
 % time of resets in seconds of week
@@ -128,7 +152,7 @@ end
 % implemented as GUI
 if settings.PLOT.coordinate
     dN(isnan(dN)) = 0;     dE(isnan(dE)) = 0;     dH(isnan(dH)) = 0;
-    CoordinatePlot(epochs, dN', dE', dH', sow, label_x_sec, seconds, reset_sec, station_date, ff);
+    CoordinatePlot_App(epochs, dN', dE', dH', sow, label_x_sec, secnds, reset_sec, station_date, ff);
 end
 if STOP_CALC; return; end
 
@@ -153,7 +177,7 @@ if STOP_CALC; return; end
 % -+-+-+-+- Figure: Map Plot -+-+-+-+-
 if settings.PLOT.map
     if true
-        velocityPlot(pos_cart, seconds, label_x_sec)
+        velocityPlot(pos_cart, secnds, label_x_sec)
     end
     vis_MaPlot(pos_geo(:,1)*180/pi, pos_geo(:,2)*180/pi, bool_true_pos, ...
         pos_true_geo.lat*180/pi, pos_true_geo.lon*180/pi, station_date, ff)
@@ -172,12 +196,12 @@ if STOP_CALC; return; end
 % Plot DOPs
 if settings.PLOT.DOP
     DOPS = [storeData.PDOP, storeData.HDOP, storeData.VDOP];
-    DOPlot(DOPS', label_x_sec, seconds, reset_sec);
+    DOPlot(DOPS', label_x_sec, secnds, reset_sec);
 end
 if STOP_CALC; return; end   %#ok<*UNRCH>
 
 
-% -+-+-+-+- Figure: Clock Plot -+-+-+-+-
+% -+-+-+-+- Figure: Receiver Clock Plot -+-+-+-+-
 if settings.PLOT.clock
     vis_plotReceiverClock(hours, label_x_h, param_', reset_h, ff_p, ...
         settings, settings.ORBCLK.file_clk, station, obs.startdate(1:3), storeData.NO_PARAM);
@@ -202,7 +226,7 @@ if STOP_CALC; return; end
 
 % -+-+-+-+- Figure: Troposphere Plot -+-+-+-+-
 if settings.PLOT.wet_tropo && settings.TROPO.estimate_ZWD
-    TropoPlot(hours, label_x_h, storeData, reset_h, obs.startdate, obs.station_long, param_, ff_p)
+    TropoPlot_App(hours, label_x_h, storeData, reset_h, obs.startdate, obs.station_long, param_, ff_p);
 end
 if STOP_CALC; return; end
 
@@ -210,7 +234,7 @@ if STOP_CALC; return; end
 % -+-+-+-+- Figure: Standard Deviation of Parameters -+-+-+-+-
 if settings.PLOT.cov_info
     std_parameters = sqrt(storeData.param_var)';
-    covParaPlot(hours, std_parameters, label_x_h, settings);
+    covParaPlot(hours, std_parameters, label_x_h, storeData.NO_PARAM, storeData.ORDER_PARAM, settings);
 end
 if STOP_CALC; return; end
 
@@ -248,7 +272,7 @@ if strcmpi(settings.PROC.method,'Code + Phase') && settings.PLOT.amb
     elseif settings.PLOT.fixed
         %     -+-+-+-+- Figure: Fixed Ambiguity Plots -+-+-+-+-
         printAmbiguityFixingRates(storeData, settings, satellites)
-        vis_plotFixedAmbiguities(settings, isGPS, isGAL, isBDS, storeData, label_x_epc, satellites)
+        vis_plotFixedAmbiguities(settings, isGPS, isGAL, isBDS, isQZSS, storeData, label_x_epc, satellites)
     end
 end
 if STOP_CALC; return; end
@@ -364,6 +388,16 @@ if settings.PLOT.cs && strcmpi(settings.PROC.method,'Code + Phase')
     else
         fprintf('Cycle-Slip-Detection with time difference disabled.          \n')
     end
+    % HMW LC
+    if isfield(settings.OTHER.CS, 'HMW') && settings.OTHER.CS.HMW
+        if isGPS; vis_cs_HMW(storeData, 'G', settings.OTHER.CS.HMW_threshold, settings.OTHER.CS.HMW_factor); end
+        if isGLO; vis_cs_HMW(storeData, 'R', settings.OTHER.CS.HMW_threshold, settings.OTHER.CS.HMW_factor); end
+        if isGAL; vis_cs_HMW(storeData, 'E', settings.OTHER.CS.HMW_threshold, settings.OTHER.CS.HMW_factor); end
+        if isBDS; vis_cs_HMW(storeData, 'C', settings.OTHER.CS.HMW_threshold, settings.OTHER.CS.HMW_factor); end
+        if isQZSS;vis_cs_HMW(storeData, 'J', settings.OTHER.CS.HMW_threshold, settings.OTHER.CS.HMW_factor); end
+    else
+        fprintf('Cycle-Slip-Detection with HMW LC disabled.          \n')
+    end
 end
 if STOP_CALC; return; end
 
@@ -415,7 +449,7 @@ if STOP_CALC; return; end
 
 %     -+-+-+-+- Figures: Correlation Plot  -+-+-+-+-
 if settings.PLOT.corr
-    CorrelationPlot(storeData, satellites, settings, epochs);
+    CorrelationPlot_App(storeData, satellites, settings, epochs);
 end
 if STOP_CALC; return; end
 

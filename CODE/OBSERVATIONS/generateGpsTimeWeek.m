@@ -33,14 +33,14 @@ function [gpsweek, gpstime] = generateGpsTimeWeek(TimeNanos, FullBiasNanos, Bias
 
 
 % constants
-WEEK_s = 604800;      % [s],   number of seconds in a week
-
+WEEK_s = 604800;                % [s], double, number of seconds in a week
+WEEK_s_int64 = int64(WEEK_s);   % [s], int64,  number of seconds in a week
 
 
 %% calculate GPS time and week
 % calculate GPS time
-gpstime_ns = TimeNanos - FullBiasNanos - BiasNanos;            % [ns]
-gpstime = double(mod(gpstime_ns, WEEK_s*1e9))*1e-9;            % convert to double and [s]
+gpstime_ns = TimeNanos - FullBiasNanos - BiasNanos;         % [ns]
+gpstime = double(mod(gpstime_ns, WEEK_s_int64*1e9))*1e-9;   % convert to double and [s]
 
 % calculate GPS week
 gpsweek = floor(abs(double(FullBiasNanos))*1e-9 / WEEK_s); 	% gps week, []
@@ -53,7 +53,7 @@ if ~exist('BiasNanos_1',     'var');     BiasNanos_1 = BiasNanos;     end
 if ~exist('FullBiasNanos_1', 'var'); FullBiasNanos_1 = FullBiasNanos; end
      
 % compute gps week's beginning time in nanoseconds for further calculations
-gps_week_ns = int64(gpsweek) * int64(WEEK_s) * 1e9;  	% [ns]
+gps_week_ns = int64(gpsweek) * WEEK_s_int64 * 1e9;  	% [ns]
 
 % compute t_RX_ns (time signal received) using FullBiasNanos(1)
 t_RX_ns = TimeNanos - FullBiasNanos_1;

@@ -1,5 +1,5 @@
 function [pos_ref_geo, North_ref, East_ref] = ...
-    LoadReferenceTrajectory(filepath, leap_sec, gpstime)
+    LoadReferenceTrajectory(filepath, leap_sec, gpstime, time)
 % Loads the data from a reference trajectory. 
 % 
 % INPUT:
@@ -21,7 +21,7 @@ function [pos_ref_geo, North_ref, East_ref] = ...
 
 
 %% Load reference trajectory
-[~, ~, ext] = fileparts(filepath);
+[~, ~, ext] = fileparts(filepath); ext = lower(ext);
 switch ext
     
     case '.nmea'
@@ -167,6 +167,68 @@ switch ext
             [pos_ref_geo, North_ref, East_ref] = LoadingFailed();
             return
         end
+
+    case {'.sp3', '.pre'}
+
+        [SP3] = read_single_sat_sp3(filepath);
+
+        n = numel(gpstime);
+        North_true = NaN(n,1); East_true = NaN(n,1); 
+        lat_wgs84 = NaN(n,1);  lon_wgs84 = NaN(n,1); h_wgs84 = NaN(n,1); 
+        for i = 1:n
+            dt = seconds(SP3.time - time(i));   % time difference of current epoch to sp3
+            dt_abs = abs(dt);
+            bool = dt_abs == min(dt_abs);
+
+            idx = find(bool);               % index of timely nearest orbit data
+
+            if dt_abs(bool) > 1e-10     % check if interpolation is needed
+            % select 12 nearest epochs for interpolation
+            start_ep = idx - 5;         % assume: nearest point is after current point in time
+            end_ep   = idx + 6;
+            if dt(bool) < 0             % nearest point is before current point in time
+                start_ep = idx - 6;     % -> change indices
+                end_ep   = idx + 5;
+            end
+            if idx <= 7                 % beginning of day, take first 12 epochs
+                start_ep = 1;
+                end_ep   = 12;
+            elseif idx + 7 >= n         % end of day, take last 12 epochs
+                start_ep = n - 11;
+                end_ep   = n;
+            end
+            eps = start_ep:end_ep;
+            % interpolate
+            [~, sow] = cal2gpstime(datevec(time(i)));
+            [X, Y, Z] = poly_interp11(sow, SP3.t(eps), SP3.X(eps), SP3.Y(eps), SP3.Z(eps));
+            else
+                % nearest entry of sp3 is close enough, just take that one
+                X = SP3.X(bool); Y = SP3.Y(bool); Z = SP3.Z(bool);
+            end
+
+
+
+            % convert to other coordinate systems
+            temp_geo = cart2geo([X, Y, Z]);
+            [North_true(i), East_true(i)] = ell2utm_GT(temp_geo.lat, temp_geo.lon);
+            lat_wgs84(i) = temp_geo.lat;
+            lon_wgs84(i) = temp_geo.lon;
+            h_wgs84(i) = temp_geo.h;
+        end
+
+        % save in output variables
+        pos_ref_geo.lat = lat_wgs84;
+        pos_ref_geo.lon = lon_wgs84;
+        pos_ref_geo.h  = h_wgs84;
+        North_ref      = North_true;
+        East_ref       = East_true;
+
+        return
+
+
+        % ||| implement interpolation?!?! consider receiver clock error
+        % (gpstime is from RINEX epoch)
+        % [X(1),X(2),X(3)] = poly_interp11(Ttr, T_ipol, X_ipol, Y_ipol, Z_ipol);
         
         
     otherwise

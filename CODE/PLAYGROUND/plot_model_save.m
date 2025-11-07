@@ -289,7 +289,7 @@ for i = 1:no_col
         elseif i < 300
             l_style = '--';     % style of the plotted Galileo sat
         elseif i < 400
-            l_style = '.';      % style of the plotted BeiDou sat
+            l_style = '-.';      % style of the plotted BeiDou sat
         end
         c = mod(i,n); if c==0; c=1; end
         if derivation == 0

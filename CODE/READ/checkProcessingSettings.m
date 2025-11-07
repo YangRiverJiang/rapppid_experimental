@@ -536,8 +536,8 @@ if settings.AMBFIX.bool_AMBFIX
 end
 
 % check if elevation weighting function is valid
-if settings.ADJ.weight_elev
-    % check if conversion was successful with elev = 45Â°
+if isa(settings.ADJ.elev_weight_fun,'function_handle') && (settings.ADJ.weight_elev || strcmpi(settings.IONO.model,'Estimate with ... as constraint'))
+    % check if conversion was successful with elev = 45 degree
     try 
         settings.ADJ.elev_weight_fun([pi/4 pi/5]);
     catch
@@ -719,7 +719,7 @@ if ~prebatch_check && settings.OTHER.antex_rec_manual
         % antenna type is empty
         errordlg({['Corrections from ' Path.myAntex ' can not be applied'],  'because the antenna type in the RINEX header is empty '}, windowname)
         valid_settings = false; return
-    elseif any(contains(lines, rheader.antenna))
+    elseif any(contains(lines, strtrim(rheader.antenna)))
         % everything is fine, continue with other checks
     else
         % MyAntex.atx has no suitable corrections
@@ -810,6 +810,19 @@ if settings.INPUT.bool_realtime && ~strcmp(settings.ADJ.filter.direction, 'Forwa
     valid_settings = false; return
 end
 
+% Satellite PPP is (currently) implemented for specific PPP models only
+if settings.ADJ.satellite.bool && contains(settings.IONO.model, 'Estimate')
+    errordlg({'Satellite PPP is not implemented for the choosen PPP model.', 'Please select another PPP model'}, windowname);
+    valid_settings = false; return
+end
+
+if settings.ADJ.satellite.bool && settings.OTHER.CS.TimeDifference && ...
+        settings.OTHER.CS.TD_degree ~= 4
+    errordlg({'Satellite PPP with time difference for cycle-slip detection:', 'Please set degree of time difference to 4!'}, windowname);
+    valid_settings = false; return
+end
+
+
 
 
 % ||| to be continued
@@ -829,6 +842,11 @@ if num_freq == 1 && ~prebatch_check
         errordlg({'Only one frequency is processed:', 'Cycle-Slip Detection dL1-dL2 is not possible!'}, windowname);
         valid_settings = false; return
     end
+    % Cycle Slip Detection with HMW LC is not possible
+    if settings.OTHER.CS.HMW && contains(settings.PROC.method, 'Phase')
+        errordlg({'Only one frequency is processed:', 'Cycle-Slip Detection with HMW LC is not possible!'}, windowname);
+        valid_settings = false; return
+    end    
     if IF_LC
         errordlg({'Only one frequency is processed:', 'Processing with 2-Frequency-IF-LC is not possible!'}, windowname);
         valid_settings = false; return

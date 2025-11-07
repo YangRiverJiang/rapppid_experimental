@@ -34,7 +34,7 @@ elseif length(date) == 2        % input: year and day of year
     doy = date(2);
     yyyy = date(1);
     jd = doy2jd_GT(yyyy,doy);
-elseif length(date) == 1        % input: gps-week and day of gps-week
+elseif isscalar(date)           % input: gps-week and day of gps-week
     dow = mod(date,1)*10;
     gpsweek = floor(date);
     jd = gps2jd_GT(gpsweek,dow*24*3600);

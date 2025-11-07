@@ -33,7 +33,10 @@ bool_DCM = strcmp(settings.IONO.model, 'Estimate, decoupled clock');
 fprintf(fileID,'%s\n','Input Data:');
 
 fprintf(fileID,'  %s%s\n','Obs-File: ', settings.INPUT.file_obs);
-fprintf(fileID,'  %s%.3f%s%.3f%s%.3f\n','Approx Pos [m]: ',settings.INPUT.pos_approx(1),' | ',settings.INPUT.pos_approx(2),' | ',settings.INPUT.pos_approx(3));
+if ~settings.ADJ.satellite.bool
+    fprintf(fileID,'  %s%.3f%s%.3f%s%.3f\n','Approx Pos [m]: ',settings.INPUT.pos_approx(1),' | ',settings.INPUT.pos_approx(2),' | ',settings.INPUT.pos_approx(3));
+end
+fprintf(fileID,'  %s%s\n','Coordinate System: ', obs.coordsyst);
 if settings.INPUT.bool_realtime
     fprintf(fileID,'  %s\n', ['Real-Time processing from ' settings.INPUT.realtime_start_GUI ' to ' settings.INPUT.realtime_ende_GUI]);
 end
@@ -93,7 +96,7 @@ end
 
 %% Models - Orbit/Clock data
 
-fprintf(fileID,'%s\n','Orbit/Clock Data:');
+fprintf(fileID,'%s\n\n','Orbit/Clock Data:');
 if settings.ORBCLK.bool_precise
     
     fprintf(fileID,'  %s\n','Precise products:');
@@ -159,7 +162,7 @@ switch settings.BIASES.code
 end
 % Estimation of receiver DCBs
 if settings.BIASES.estimate_rec_dcbs
-    fprintf(fileID,'    %s\n','Receiver DCB Estimation is enabled');
+    fprintf(fileID,'    %s\n','Receiver Bias Estimation is enabled');
 end
 
 % Phase Biases
@@ -321,6 +324,9 @@ if settings.OTHER.CS.l1c1 || settings.OTHER.CS.DF || settings.OTHER.CS.Doppler
     if settings.OTHER.CS.TimeDifference
         fprintf(fileID,'    %s%.2f%s%.2f%s%d\n','Time difference: threshold = ',settings.OTHER.CS.TD_threshold,' [m], degree = ',settings.OTHER.CS.TD_degree );
     end    
+    if settings.OTHER.CS.HMW
+        fprintf(fileID,'    %s%.2f%s%.2f%s%d\n','HMW LC: threshold = ',settings.OTHER.CS.HMW_threshold,' [cy], factor = ',settings.OTHER.CS.HMW_factor );
+    end    
     if settings.PROC.LLI
         fprintf(fileID,'    %s\n','LLI from RINEX is used');
     end
@@ -344,13 +350,19 @@ fprintf(fileID,'  %s','Weighting Scheme for Observations: ');
 if settings.ADJ.weight_mplc
     fprintf(fileID,'%s\n','Multipath-LC');
 elseif settings.ADJ.weight_elev
-    fprintf(fileID,'%s%s\n','Elevation, function: ', strrep(func2str(settings.ADJ.elev_weight_fun), '@(e)', ''));
+    if ischar(settings.ADJ.elev_weight_fun)
+        fprintf(fileID,'%s%s\n','Elevation: ', settings.ADJ.elev_weight_fun);
+    else
+        fprintf(fileID,'%s%s\n','Elevation, function: ', strrep(func2str(settings.ADJ.elev_weight_fun), '@(e)', ''));
+    end
 elseif settings.ADJ.weight_sign_str
     if ischar(settings.ADJ.snr_weight_fun)
         fprintf(fileID,'%s%s\n','C/N0: ', settings.ADJ.snr_weight_fun);
     else
         fprintf(fileID,'%s%s\n','C/N0, function: ', strrep(func2str(settings.ADJ.snr_weight_fun), '@(snr)', ''));
     end
+elseif settings.ADJ.weight_bore
+    fprintf(fileID,'%s\n','Boresight angle');
 elseif settings.ADJ.weight_none
     fprintf(fileID,'%s\n','None');
 end
@@ -409,6 +421,9 @@ if ~strcmp(settings.ADJ.filter.type,'No Filter')
     fprintf(fileID,'    %s%s\n', 'Filter direction: ', settings.ADJ.filter.direction);
     fprintf(fileID,'    %s\n', 'Filter-Settings (initial standard deviation [m] | system noise standard deviation [m/sqrt(h)] | dynamic model):');
     fprintf(fileID,'    %s%11.3f%s%11.3f%s%d\n','Coordinates:        ',sqrt(settings.ADJ.filter.var_coord),    ' | ',sqrt(settings.ADJ.filter.Q_coord),     ' | ',settings.ADJ.filter.dynmodel_coord);
+    if settings.ADJ.satellite.bool
+        fprintf(fileID,'    %s%11.3f%s%11.3f%s%d\n','Velocity:           ',sqrt(settings.ADJ.filter.var_velocity), ' | ',sqrt(settings.ADJ.filter.Q_velocity),  ' | ', settings.ADJ.filter.dynmodel_velocity);
+    end
     if settings.TROPO.estimate_ZWD
         fprintf(fileID,'    %s%11.3f%s%11.3f%s%d\n','Zenith Wet Delay:   ',sqrt(settings.ADJ.filter.var_zwd),      ' | ',sqrt(settings.ADJ.filter.Q_zwd),       ' | ', settings.ADJ.filter.dynmodel_zwd);
     end
@@ -439,10 +454,12 @@ if ~strcmp(settings.ADJ.filter.type,'No Filter')
 end
 if settings.ADJ.satellite.bool
     fprintf(fileID,'  %s\n', 'Satellite, dynamic model is applied');
+    fprintf(fileID,'    %s%s\n', 'Identifier: ', settings.ADJ.satellite.ID);
     fprintf(fileID,'    %s%.2f\n', 'Mass [kg]: ',  settings.ADJ.satellite.mass);
     fprintf(fileID,'    %s%.2f\n', 'Area [m^2]: ', settings.ADJ.satellite.area);
-    fprintf(fileID,'    %s%.2f\n', 'Drag coefficient []', settings.ADJ.satellite.drag);
-    fprintf(fileID,'    %s%.2f\n', 'Solar coefficient []', settings.ADJ.satellite.solar);
+    fprintf(fileID,'    %s%.2f\n', 'Drag coefficient []: ', settings.ADJ.satellite.drag);
+    fprintf(fileID,'    %s%.2f\n', 'Solar coefficient []: ', settings.ADJ.satellite.solar);
+    fprintf(fileID,'    %s%s\n', 'Orientation mode: ', settings.ADJ.satellite.orient_mode);
 end
 fprintf(fileID,'  %s%d','Number of estimated parameters: ', ~bool_DCM*DEF.NO_PARAM_ZD + bool_DCM*DEF.NO_PARAM_DCM);
 fprintf(fileID,'\n');
@@ -451,7 +468,7 @@ fprintf(fileID,'\n');
 
 %% Estimation - Ambiguity Fixing
 
-fprintf(fileID,'%s\n','Ambiguity Fixing: ');
+fprintf(fileID,'\n%s\n','Ambiguity Fixing: ');
 if settings.AMBFIX.bool_AMBFIX
     if ~bool_DCM
         fprintf(fileID,'  %s%.0f%s%.0f%s\n','Fixing-Start [s]: WL = ',settings.AMBFIX.start_WL_sec,', NL = ',settings.AMBFIX.start_NL_sec);
@@ -484,6 +501,7 @@ fprintf(fileID,'\n');
 
 fprintf(fileID,'%s\n','Processing Options:');
 
+fprintf(fileID,'  %s%s\n','Processing name: ', settings.PROC.name);
 fprintf(fileID,'  %s%s\n','Output: ', settings.PROC.output_dir);
 if settings.PROC.timeSpan_format_epochs
     fprintf(fileID,'  %s%d%s%d\n','Epochs: ',settings.PROC.timeFrame(1),' - ',settings.PROC.timeFrame(2));
@@ -635,25 +653,33 @@ fprintf(fileID,'\n');
 
 %% Export options
 fprintf(fileID,'Export options:\n');
+% Output
 fprintf(fileID,'  Output\n');
+if settings.EXP.settings
+    fprintf(fileID,'    settings.mat is exported\n');
+end
 if settings.EXP.data4plot
     fprintf(fileID,'    data4plot.mat is exported\n');
 end
 if settings.EXP.model_save
     fprintf(fileID,'    model_save is saved to data4plot.mat\n');
 end
-if settings.EXP.results_float
-    fprintf(fileID,'    results_float.txt is written\n');
-end
-if settings.AMBFIX.bool_AMBFIX && settings.EXP.results_fixed
-    fprintf(fileID,'    results_fixed.txt is written\n');
-end
-if settings.EXP.settings
-    fprintf(fileID,'    settings.mat is exported\n');
-end
 if settings.EXP.settings_summary
     fprintf(fileID,'    settings_summary.txt is written\n');
 end
+if settings.EXP.results_txt
+    fprintf(fileID,'    results_float.txt is written\n');
+end
+if settings.EXP.results_txt && settings.AMBFIX.bool_AMBFIX
+    fprintf(fileID,'    results_fixed.txt is written\n');
+end
+if settings.EXP.results_csv
+    fprintf(fileID,'    results_float.csv is written\n');
+end
+if settings.EXP.results_csv && settings.AMBFIX.bool_AMBFIX
+    fprintf(fileID,'    results_fixed.csv is written\n');
+end
+% Variables: obs
 fprintf(fileID,'  Variables\n');
 if settings.EXP.obs_bias
     fprintf(fileID,'    C1_/.../L1_/.../L3_bias is saved to obs\n');
@@ -661,19 +687,23 @@ end
 if settings.EXP.obs_epochheader
     fprintf(fileID,'    epochheader is saved to obs\n');
 end
-if settings.EXP.storeData_iono_mf
+% Variables: storeData
+if settings.EXP.storeData && settings.EXP.storeData_iono_mf
     fprintf(fileID,'    iono_mf is saved to storeData\n');
 end
-if settings.EXP.storeData_vtec
+if settings.EXP.storeData && settings.EXP.storeData_vtec
     fprintf(fileID,'    vtec is saved to storeData\n');
 end
-if settings.EXP.storeData_mp_1_2
+if settings.EXP.storeData && settings.EXP.storeData_mp_1_2
     fprintf(fileID,'    mp1, mp2 is saved to storeData\n');
 end
-if settings.EXP.storeData_sat_status
+if settings.EXP.storeData && settings.EXP.storeData_sat_status
     fprintf(fileID,'    sat_status is saved to storeData\n');
 end
-
+% Variables: satellites
+if settings.EXP.satellites && settings.EXP.satellites_D
+    fprintf(fileID,'    .D1, .D2, .D3 is saved to satellites\n');
+end
 
 %% Processing end and time
 fprintf(fileID,'\n\n');
@@ -692,7 +722,7 @@ sec = mod(proc_time,60);
 min = floor(proc_time/60);
 proc_string = ['  Duration: ' sprintf('%.0f', min) 'min ' sprintf('%02.02f',sec) 'sec'];
 fprintf(fileID,'%s\n',proc_string);
-fprintf(fileID,'  End: %s\n', datestr(clock));
+fprintf(fileID,'  End: %s\n', datetime('now'));
 
 
 

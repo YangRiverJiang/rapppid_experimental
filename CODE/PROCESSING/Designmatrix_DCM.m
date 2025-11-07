@@ -35,7 +35,6 @@ isGAL = repmat(Epoch.gal,  num_freq, 1);
 isBDS = repmat(Epoch.bds,  num_freq, 1); 
 isQZS = repmat(Epoch.qzss, num_freq, 1);  	
 
-NO_PARAM = Adjust.NO_PARAM;
 s_f = n*num_freq;                   % satellites x frequencies
 exclude = Epoch.exclude(:);         % satellite excluded?
 usePhase = ~Epoch.cs_found(:);      % use phase observation? (e.g., cycle slip found)

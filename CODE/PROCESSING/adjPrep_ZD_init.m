@@ -47,12 +47,14 @@ no_ambiguities = s_f * bool_code_phase;	% number of estimated ambiguities
 
 
 %% Parameter vector
-param = zeros(NO_PARAM + no_ambiguities, 1);    % 22 + #ambiguities
-param(1:3,1) = settings.INPUT.pos_approx;       % approximate position (X,Y,Z)
-if  bool_filter && norm(settings.INPUT.pos_approx) == 0
-    param(1:3,1) = ApproximatePosition(Epoch, input, obs, settings);
+param_vec = zeros(NO_PARAM + no_ambiguities, 1);    % 22 + #ambiguities
+if ~settings.ADJ.satellite.bool
+    param_vec(1:3,1) = settings.INPUT.pos_approx;       % approximate position (X,Y,Z)
 end
-param_pred = param;         % no prediction in first epoch
+if bool_filter && norm(param_vec(1:3)) == 0
+    param_vec(1:3,1) = ApproximatePosition(Epoch, input, obs, settings);
+end
+param_pred = param_vec;         % no prediction in first epoch
 % other parameters don´t have approximate values so they are zero
 
 
@@ -183,10 +185,10 @@ if bool_filter
     
     if settings.ADJ.satellite.bool
         % save approximate position
-        Adjust.approx_position = param(1:3);
+        Adjust.approx_position = param_vec(1:3);
         % use dynamic prediction for satellite PPP
         [param_pred(1:6), Transition] = ...
-            DynamicPredictionPosVel(param, Epoch, obs, settings, Transition, Adjust.reset_time);
+            DynamicPredictionPosVel(param_vec, Epoch, obs, settings, Transition, Adjust.reset_time, Adjust.float);
     end
     
     
@@ -201,7 +203,7 @@ end
 
 %% save to Adjust
 % --- parameter vector ---
-Adjust.param = param;
+Adjust.param = param_vec;
 Adjust.param_pred = param_pred;
 
 % --- covariance matrix ---

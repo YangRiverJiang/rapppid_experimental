@@ -17,6 +17,7 @@ function [Epoch, Adjust] = NL_fixing_IF(Epoch, Adjust, b_WL, b_NL, elevs, settin
 %   2023/06/11, MFWG: adding QZSS
 %   2024/12/30, MFWG: switching to LAMBDA 4.0
 %   2025/03/31, MFWG: convert Q_NN from meters to cycles
+%   2025/10/17, MFWG: QZSS fixing
 % 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -37,11 +38,12 @@ no_gps  = sum(Epoch.gps);
 no_glo  = sum(Epoch.glo);
 no_gal  = sum(Epoch.gal);
 no_bds  = sum(Epoch.bds);
-% no_qzss = sum(Epoch.qzss);      % not needed, because QZSS is the "last" GNSS
-% reference satellites of GPS, Galileo, BeiDou
+no_qzs  = sum(Epoch.qzss); 
+% reference satellites of GPS, Galileo, BeiDou, QZSS
 refSatG_idx = Epoch.refSatGPS_idx;
 refSatE_idx = Epoch.refSatGAL_idx;
 refSatC_idx = Epoch.refSatBDS_idx;
+refSatJ_idx = Epoch.refSatQZS_idx;
 % is satellite fixable?
 fixable = Epoch.fixable;
 
@@ -51,6 +53,7 @@ param_N = Adjust.param(idx);    % float ambiguities
 param_N_gps = param_N(Epoch.gps);       % GPS float ambiguities
 param_N_gal = param_N(Epoch.gal);       % Galileo float ambiguities
 param_N_bds = param_N(Epoch.bds);       % BeiDou float ambiguities
+param_N_qzs = param_N(Epoch.qzss);      % QZSS float ambiguities
 
 % get covariance matrix and convert from meters to cycles
 Q_NN = Adjust.param_sigma(idx, idx);    % covariance matrix of float ambiguities
@@ -58,25 +61,25 @@ lam = (f1.^2 .* l1 - f2.^2 .* l2) ./ (f1.^2 - f2.^2);   % wavelength of IF LC ||
 Q_NN = Q_NN ./ lam;      % divide rows by wavelength
 Q_NN = Q_NN ./ lam';     % divide columns by wavelength
 
-% remove Glonass and QZSS (if processed in float solution)
-if settings.INPUT.use_GLO || settings.INPUT.use_QZSS
+% remove GLONASS and QZSS (if processed in float solution)
+if settings.INPUT.use_GLO
     % GLONASS and QZSS satellites are not needed in the following variables
-    is_glo_qzss = Epoch.glo | Epoch.qzss;
-    sats(is_glo_qzss) = [];
-    Q_NN(is_glo_qzss, :) = [];
-    Q_NN(:, is_glo_qzss) = [];
-    f1(is_glo_qzss) = [];
-    f2(is_glo_qzss) = [];
-    l1(is_glo_qzss) = [];
-    b_WL(is_glo_qzss) = [];
-    b_NL(is_glo_qzss) = [];
-    fixable(is_glo_qzss) = [];
+    is_glo = Epoch.glo;
+    sats(is_glo) = [];
+    Q_NN(is_glo, :) = [];
+    Q_NN(:, is_glo) = [];
+    f1(is_glo) = [];
+    f2(is_glo) = [];
+    l1(is_glo) = [];
+    b_WL(is_glo) = [];
+    b_NL(is_glo) = [];
+    fixable(is_glo) = [];
 end
 
 
 %% Prepare solving the NL ambiguities
 % Single-difference covariance matrix
-C = eye(no_gps+no_gal+no_bds);
+C = eye(no_gps+no_gal+no_bds+no_qzs);
 % Create matrix C for covariance propagation of covariance matrix
 C = -C;
 if settings.INPUT.use_GPS
@@ -85,15 +88,21 @@ if settings.INPUT.use_GPS
 end
 if settings.INPUT.use_GAL
     bool_gal = Epoch.gal;
-    bool_gal(Epoch.glo) = [];   % for GLO+GAL-processing
+    bool_gal(Epoch.glo) = [];   % for GLO+GAL processing
     C(bool_gal,refSatE_idx-no_glo) = 1;
     C(refSatE_idx-no_glo,refSatE_idx-no_glo) = 0;
 end
 if settings.INPUT.use_BDS
     bool_bds = Epoch.bds;
-    bool_bds(Epoch.glo) = [];   % for GLO+BDS-processing
+    bool_bds(Epoch.glo) = [];   % for GLO+BDS processing
     C(bool_bds,refSatC_idx-no_glo) = 1;
     C(refSatC_idx-no_glo,refSatC_idx-no_glo) = 0;
+end
+if settings.INPUT.use_QZSS
+    bool_qzs = Epoch.qzss;
+    bool_qzs(Epoch.glo) = [];   % for GLO+QZSS processing
+    C(bool_qzs,refSatJ_idx-no_glo) = 1;
+    C(refSatJ_idx-no_glo,refSatJ_idx-no_glo) = 0;
 end
 % calculate covariance propagation
 Q_NN_SD = C*Q_NN*C';  	% Variance-Covariance-Matrix of SD float ambiguities
@@ -108,7 +117,10 @@ end
 if ~isempty(refSatC_idx)
     param_N_bds = param_N_bds(refSatC_idx-no_gps-no_glo-no_gal) - param_N_bds;
 end
-param_N_SD = [param_N_gps; param_N_gal; param_N_bds];    % SD float ambiguities
+if ~isempty(refSatJ_idx)
+    param_N_qzs = param_N_qzs(refSatJ_idx-no_gps-no_glo-no_gal-no_bds) - param_N_qzs;
+end
+param_N_SD = [param_N_gps; param_N_gal; param_N_bds; param_N_qzs];    % SD float ambiguities
 
 
 % calculate NL ambiguities from the float IF ambiguities
@@ -118,7 +130,7 @@ NL_float = NL_float + b_NL;
 
 % remove reference satellite and satellites which are not fixable
 rem = isnan(NL_float);
-refSatsIdx = [refSatG_idx, refSatE_idx-no_glo, refSatC_idx-no_glo];
+refSatsIdx = [refSatG_idx, refSatE_idx-no_glo, refSatC_idx-no_glo, refSatJ_idx-no_glo];
 rem(refSatsIdx) = true;
 rem(~fixable) = true;
 % delete float estimation and row&column in covariance matrix

@@ -1,8 +1,7 @@
-function [Epoch, Adjust] = PPPAR_UC(HMW_12, HMW_23, HMW_13, Adjust, Epoch, settings, obs, model)
+function [Epoch, Adjust] = PPPAR_UC(Adjust, Epoch, settings, obs, model)
 % Fix ambiguities and calculating fixed position in the uncombined model.
 %
 % INPUT:
-%	HMW_12,...      Hatch-Melbourne-Wübbena LC observables
 % 	Adjust          adjustment data and matrices for current epoch [struct]
 %	Epoch           epoch-specific data for current epoch [struct]
 %	settings        settings from GUI [struct]
@@ -22,34 +21,46 @@ function [Epoch, Adjust] = PPPAR_UC(HMW_12, HMW_23, HMW_13, Adjust, Epoch, setti
 
 % ||| QZSS is not considered
 
-
-% get some epoch-specific variables
-is_gps = Epoch.gps;                 % boolean for GPS satellites
-is_glo = Epoch.glo;                 % boolean for GLONASS satellites
-is_gal = Epoch.gal;                 % boolean for Galileo satellites
-is_bds = Epoch.bds;                 % boolean for Galileo satellites
-no_gps = sum(is_gps);               % number of GPS satellites
-no_glo = sum(is_glo);               % number of GLONASS satellites
-no_gal = sum(is_gal);               % number of Galileo satellites
-no_sats = numel(Epoch.sats);        % number of satellites
 NO_PARAM = Adjust.NO_PARAM;         % number of estimated parameters
-idx_G = Epoch.refSatGPS_idx;        % index of GPS reference satellite
-idx_E = Epoch.refSatGAL_idx;        % index of Galileo reference satellite
-idx_E_ = Epoch.refSatGAL_idx-no_glo;% index of Galileo reference satellite without GLONASS
+
+% boolean vector if satellite belongs to specific GNSS
+is_gps = Epoch.gps;                 % GPS
+is_glo = Epoch.glo;                 % GLONASS
+is_gal = Epoch.gal;                 % Galileo
+is_bds = Epoch.bds;                 % BeiDou
+
+% number of satellites
+no_gps = sum(is_gps);               % GPS
+no_glo = sum(is_glo);               % GLONASS
+no_gal = sum(is_gal);               % Galileo
+no_bds = sum(is_bds);               % BeiDou
+no_sats = numel(Epoch.sats);        % all GNSS
+
+% indices of reference satellites
+idx_G = Epoch.refSatGPS_idx;        % GPS reference satellite
+idx_E = Epoch.refSatGAL_idx;        % Galileo reference satellite
+idx_C = Epoch.refSatBDS_idx;        % BeiDou reference satellite
+
 % processing settings
 proc_frqs = settings.INPUT.proc_freqs;  % number of processed frequencies
 s_f = no_sats*proc_frqs;                % #satellites x #frequencies
 q = Epoch.q;                            % epoch number of processing
 q0 = Adjust.fixed_reset_epochs(end);    % epoch number of last reset
 
+% get Hatch-Melbourne-Wübbena linear combination
+HMW_12 = Adjust.HMW_12;
+HMW_23 = Adjust.HMW_23;
+HMW_13 = Adjust.HMW_13;
+
 % check if fixing has started
-if Adjust.fix_now(2)
+if ~Adjust.fix_now(2)
     return
 end
 
 % check if fixing is possible at all
-if (settings.INPUT.use_GAL && Epoch.refSatGAL == 0) || ...
-        (settings.INPUT.use_GPS && Epoch.refSatGPS == 0)
+if (settings.INPUT.use_GPS && Epoch.refSatGPS == 0) || ...
+        (settings.INPUT.use_GAL && Epoch.refSatGAL == 0) || ...
+        (settings.INPUT.use_BDS && Epoch.refSatBDS == 0)
     Adjust = fixing_failed(Adjust);
     return
 end
@@ -84,6 +95,7 @@ if proc_frqs > 1
     idx_1 = (NO_PARAM +             1):(NO_PARAM +   no_sats);      % index for 1st frequency
     idx_2 = (NO_PARAM +   no_sats + 1):(NO_PARAM + 2*no_sats);      % ...
     idx_3 = (NO_PARAM + 2*no_sats + 1):(NO_PARAM + 3*no_sats);
+
     % get float ambiguities
     N1 = Adjust.param(idx_1);
     N2 = Adjust.param(idx_2);
@@ -99,14 +111,13 @@ if proc_frqs > 1
     Q_NN_2 = Adjust.param_sigma(idx_2,idx_2);
     Q_NN_3 = Adjust.param_sigma(idx_3,idx_3);
     Q_NN = Adjust.param_sigma([idx_1,idx_2,idx_3],[idx_1,idx_2,idx_3]);
-    
     % convert covariance matrizes from meters to cycles
     Q_NN_1 = Q_NN_1 ./ Epoch.l1;	% divide rows by wavelength
     Q_NN_1 = Q_NN_1 ./ Epoch.l1';  	% divide columns by wavelength
     
     % Create matrix C for covariance propagation of covariance matrix
     % to calculate SD covariance matrix
-    C = -eye(no_gps+no_glo+no_gal);
+    C = -eye(no_gps+no_glo+no_gal+no_bds);
     if settings.INPUT.use_GPS
         C(is_gps, idx_G) = 1;
         C(idx_G, idx_G) = 0;
@@ -115,6 +126,10 @@ if proc_frqs > 1
         C(is_gal, idx_E) = 1;
         C(idx_E, idx_E) = 0;
     end
+    if settings.INPUT.use_BDS
+        C(is_bds, idx_E) = 1;
+        C(idx_E, idx_E) = 0;
+    end    
     % calculate SD covariance matrix
     Q_NN_1_SD = C*Q_NN_1*C';  	% ... for N1 ambiguities
     Q_NN_2_SD = C*Q_NN_2*C';  	% ... for N2 ambiguities
@@ -130,6 +145,9 @@ if proc_frqs > 1
     N1_cy_SD(is_gal) = N1_cy(idx_E) - N1_cy(is_gal);
     N2_cy_SD(is_gal) = N2_cy(idx_E) - N2_cy(is_gal);
     N3_cy_SD(is_gal) = N3_cy(idx_E) - N3_cy(is_gal);
+    N1_cy_SD(is_bds) = N1_cy(idx_C) - N1_cy(is_bds);
+    N2_cy_SD(is_bds) = N2_cy(idx_C) - N2_cy(is_bds);
+    N3_cy_SD(is_bds) = N3_cy(idx_C) - N3_cy(is_bds);    
     % put together
     N_cy_SD = [N1_cy_SD; N2_cy_SD; N3_cy_SD];
     
@@ -152,6 +170,7 @@ if proc_frqs > 1
     % exclude reference satellites
     fixit(idx_G) = false;
     fixit(idx_E) = false;
+    fixit(idx_C) = false;
     % extract only fixable ambiguities and corresponding parts of
     % covariance matrix on 1st frequency for fixing with LAMBDA
     N1_cy_SD_sub = N1_cy_SD(fixit)';
@@ -216,7 +235,6 @@ if proc_frqs > 1
     Adjust.N1_fixed = N_fixed(1, :);
     Adjust.N2_fixed = N_fixed(2, :);
     Adjust.N3_fixed = N_fixed(3, :);
-    
     
 else
     %% single frequency ambiguity fixing
@@ -287,6 +305,7 @@ if sum( sum(~isnan(N_fixed)) > 1 ) >= 3
     % 3 satellites or more have at least ambiguities on two frequencies
     % fixed -> this condition works for 2-frequency processing also
     [Adjust, Epoch] = fixedAdjustment_UC_SD(Epoch, Adjust, model, settings);
+
 else           	% not enough ambiguities fixed to calcute fixed solution
     Adjust = fixing_failed(Adjust);
 end

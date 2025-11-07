@@ -10,7 +10,7 @@ switch char
     case 'G'
         gnss_string = 'GPS';
     case 'R'
-        gnss_string = 'Glonass';
+        gnss_string = 'GLONASS';
     case 'E'
         gnss_string = 'Galileo';
     case 'C'

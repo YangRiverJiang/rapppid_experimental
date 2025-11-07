@@ -10,6 +10,9 @@ function XYZ = getCoordinates(stations, dates, coordsyst)
 % OUTPUT:
 %   XYZ         [matrix], true coordinates for each station and corresponding day
 %
+% Revision:
+%   ...
+% 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
@@ -40,6 +43,10 @@ if all( abs(XYZ(:)) > 1e4 );   return;   end
 
 % ----- check weekly IGS estimation ------
 XYZ = get_weekly_IGS_coordinates(stations, dates, XYZ, coordsyst);
+if all( abs(XYZ(:)) > 1e4 );   return;   end
+
+% ----- try station position time series from webigs-rf.ign.fr -----
+XYZ = get_station_position_time_series(stations, dates, XYZ);
 if all( abs(XYZ(:)) > 1e4 );   return;   end
 
 % ----- check EUREF estimation -----

@@ -2,14 +2,14 @@ function input = readAntex(input, settings, jd_start, antenna_type)
 % Reads in an antex-file and stores the satellite and receiver Phase Center
 % Offsets (PCO) and satellite and receiver Phase Center Variations (PCV)
 % into an internal format.
-% Format-details: 
+% Format-details:
 %   https://files.igs.org/pub/station/general/antenna_README.pdf
-% latest atx-Files: 
+% latest atx-Files:
 %   https://files.igs.org/pub/station/general/
 %
 % INPUT:
 %   input           struct, containing all input data for processing
-%   settings        struct, processing settings from GUI            
+%   settings        struct, processing settings from GUI
 %   jd_start        julian date of start of observation file
 %   antenna_type  	string, name of antenna type
 
@@ -19,6 +19,7 @@ function input = readAntex(input, settings, jd_start, antenna_type)
 % Revision:
 %   2023/11/03, MFWG: adding QZSS
 %   2024/01/04, MFWG: adding additional BeiDou frequencies
+%   2025/09/02, MFWG: read and save PCOs+PCVs of all GNSS
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -26,17 +27,12 @@ function input = readAntex(input, settings, jd_start, antenna_type)
 
 file = settings.OTHER.file_antex;               % string, path to ANTEX-File
 myantex = settings.OTHER.antex_rec_manual;      % boolean, true if receiver corrections in MyAntex.atx
-GPS_on = settings.INPUT.use_GPS;                % boolean, true if GNSS is enabled
-GLO_on = settings.INPUT.use_GLO;
-GAL_on = settings.INPUT.use_GAL;
-BDS_on = settings.INPUT.use_BDS;
-QZSS_on = settings.INPUT.use_QZSS;
 bool_print = ~settings.INPUT.bool_parfor;       % boolean, true if output is printed to command window
 
 
 %% Initializiation of variables and preparations
 % Phase Center Offsets satellites [m]:
-% each dimension corresponds to a frequency, on each dimension each row 
+% each dimension corresponds to a frequency, on each dimension each row
 % corresponds to a satellite and the columns are:
 % prn | PCO in X | PCO in Y | PCO in Z | raPPPid number of frequency
 PCO_GPS = zeros(DEF.SATS_GPS,5,6); 	% L1 - L2  - L5  - empty - empty - empty
@@ -143,7 +139,7 @@ while i < length(lines)                             % loop over lines
                     offset = sscanf(tline,'%f',3);      % [mm]
                     offset = offset/1000;               % conversion to [m]
                     if ~isempty(nr) && ...              % corrections are temporally valid
-                            (jd_from <= jd_start) && (jd_start <=  jd_until)        
+                            (jd_from <= jd_start) && (jd_start <=  jd_until)
                         switch sys
                             case 'G'
                                 % GPS is saved in any case to replace
@@ -151,25 +147,17 @@ while i < length(lines)                             % loop over lines
                                 PCO_GPS(prn,:,nr) = [prn; offset(1); offset(2); offset(3); nr];
                                 [PCV_GPS, i] = read_save_PCV_sat(lines, i, PCV_GPS, zen, nr, prn);
                             case 'R'
-                                if GLO_on
-                                    PCO_GLO(prn,:,nr) = [prn; offset(1); offset(2); offset(3); nr];
-                                    [PCV_GLO, i] = read_save_PCV_sat(lines, i, PCV_GLO, zen, nr, prn);
-                                end
+                                PCO_GLO(prn,:,nr) = [prn; offset(1); offset(2); offset(3); nr];
+                                [PCV_GLO, i] = read_save_PCV_sat(lines, i, PCV_GLO, zen, nr, prn);
                             case 'E'
-                                if GAL_on
-                                    PCO_GAL(prn,:,nr) = [prn; offset(1); offset(2); offset(3); nr];
-                                    [PCV_GAL, i] = read_save_PCV_sat(lines, i, PCV_GAL, zen, nr, prn);
-                                end
+                                PCO_GAL(prn,:,nr) = [prn; offset(1); offset(2); offset(3); nr];
+                                [PCV_GAL, i] = read_save_PCV_sat(lines, i, PCV_GAL, zen, nr, prn);
                             case 'C'
-                                if BDS_on
-                                    PCO_BDS(prn,:,nr) = [prn; offset(1); offset(2); offset(3); nr];
-                                    [PCV_BDS, i] = read_save_PCV_sat(lines, i, PCV_BDS, zen, nr, prn);
-                                end
+                                PCO_BDS(prn,:,nr) = [prn; offset(1); offset(2); offset(3); nr];
+                                [PCV_BDS, i] = read_save_PCV_sat(lines, i, PCV_BDS, zen, nr, prn);
                             case 'J'
-                                if QZSS_on
-                                    PCO_QZSS(prn,:,nr) = [prn; offset(1); offset(2); offset(3); nr];
-                                    [PCV_QZSS, i] = read_save_PCV_sat(lines, i, PCV_QZSS, zen, nr, prn);
-                                end
+                                PCO_QZSS(prn,:,nr) = [prn; offset(1); offset(2); offset(3); nr];
+                                [PCV_QZSS, i] = read_save_PCV_sat(lines, i, PCV_QZSS, zen, nr, prn);
                             otherwise
                                 % nothing to do here
                         end
@@ -211,25 +199,17 @@ while i < length(lines)                             % loop over lines
                             PCO_rec_GPS(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
                             [PCV_rec_GPS, i] = read_save_PCV_rec(lines, i, PCV_rec_GPS, zen, nr);
                         case 'G'        % Glonass
-                            if GLO_on
-                                PCO_rec_GLO(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
-                                [PCV_rec_GLO, i] = read_save_PCV_rec(lines, i, PCV_rec_GLO, zen, nr);
-                            end
+                            PCO_rec_GLO(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
+                            [PCV_rec_GLO, i] = read_save_PCV_rec(lines, i, PCV_rec_GLO, zen, nr);
                         case 'E'        % Galileo
-                            if GAL_on
-                                PCO_rec_GAL(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
-                                [PCV_rec_GAL, i] = read_save_PCV_rec(lines, i, PCV_rec_GAL, zen, nr);
-                            end
+                            PCO_rec_GAL(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
+                            [PCV_rec_GAL, i] = read_save_PCV_rec(lines, i, PCV_rec_GAL, zen, nr);
                         case {'B', 'C'} % BeiDou
-                            if BDS_on
-                                PCO_rec_BDS(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
-                                [PCV_rec_BDS, i] = read_save_PCV_rec(lines, i, PCV_rec_BDS, zen, nr);
-                            end
+                            PCO_rec_BDS(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
+                            [PCV_rec_BDS, i] = read_save_PCV_rec(lines, i, PCV_rec_BDS, zen, nr);
                         case 'J'        % QZSS
-                            if QZSS_on
-                                PCO_rec_QZSS(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
-                                [PCV_rec_QZSS, i] = read_save_PCV_rec(lines, i, PCV_rec_QZSS, zen, nr);
-                            end
+                            PCO_rec_QZSS(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
+                            [PCV_rec_QZSS, i] = read_save_PCV_rec(lines, i, PCV_rec_QZSS, zen, nr);
                     end
                 end
                 if contains(tline, 'END OF ANTENNA')
@@ -247,10 +227,10 @@ end
 
 %% ------ RECEIVER-ANTENNA from MyAntex.atx ------
 if myantex
-    
+
     % open file
     fid = fopen(Path.myAntex);
-    
+
     % check if file is valid and could be opened
     if fid==-1
         if ~isempty(file) && bool_print
@@ -258,12 +238,12 @@ if myantex
         end
         return
     end
-    
+
     % get data and close file
     lines = textscan(fid,'%s', 'delimiter','\n', 'whitespace','');
     lines = lines{1};
     fclose(fid);
-    
+
     ii = 1;
     while ii < length(lines)                             % loop over lines
         ii = ii+1;
@@ -291,30 +271,22 @@ if myantex
                             PCO_rec_GPS(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
                             [PCV_rec_GPS, ii] = read_save_PCV_rec(lines, ii, PCV_rec_GPS, zen, nr);
                         case 'G'        % Glonass
-                            if GLO_on
-                                PCO_rec_GLO(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
-                                [PCV_rec_GLO, ii] = read_save_PCV_rec(lines, ii, PCV_rec_GLO, zen, nr);
-                            end
+                            PCO_rec_GLO(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
+                            [PCV_rec_GLO, ii] = read_save_PCV_rec(lines, ii, PCV_rec_GLO, zen, nr);
                         case 'E'        % Galileo
-                            if GAL_on
-                                PCO_rec_GAL(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
-                                [PCV_rec_GAL, ii] = read_save_PCV_rec(lines, ii, PCV_rec_GAL, zen, nr);
-                            end
+                            PCO_rec_GAL(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
+                            [PCV_rec_GAL, ii] = read_save_PCV_rec(lines, ii, PCV_rec_GAL, zen, nr);
                         case {'B', 'C'} % BeiDou
-                            if BDS_on
-                                PCO_rec_BDS(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
-                                [PCV_rec_BDS, ii] = read_save_PCV_rec(lines, ii, PCV_rec_BDS, zen, nr);
-                            end
+                            PCO_rec_BDS(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
+                            [PCV_rec_BDS, ii] = read_save_PCV_rec(lines, ii, PCV_rec_BDS, zen, nr);
                         case 'J'        % QZSS
-                            if QZSS_on
-                                PCO_rec_QZSS(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
-                                [PCV_rec_QZSS, ii] = read_save_PCV_rec(lines, ii, PCV_rec_QZSS, zen, nr);
-                            end
+                            PCO_rec_QZSS(:,nr) = sscanf(tline,'%f',3)/1000;  % Receiver Phase center offsets [m]
+                            [PCV_rec_QZSS, ii] = read_save_PCV_rec(lines, ii, PCV_rec_QZSS, zen, nr);
                     end
                 end
                 if contains(tline, 'END OF ANTENNA')
-                    break           % stop loop over the remaining lines, 
-                                    % because receiver corrections have been found
+                    break           % stop loop over the remaining lines,
+                    % because receiver corrections have been found
                 end
             end
         end
@@ -323,49 +295,31 @@ end
 
 
 
-%% save variables 
-% GPS is saved in any case to replace missing corrections later-on
+%% save variables
 
 % save Phase Center Offsets
 input.OTHER.PCO.sat_GPS = PCO_GPS;
 input.OTHER.PCO.rec_GPS = PCO_rec_GPS;
-if GLO_on
-    input.OTHER.PCO.sat_GLO = PCO_GLO;
-    input.OTHER.PCO.rec_GLO = PCO_rec_GLO;
-end
-if GAL_on
-    input.OTHER.PCO.sat_GAL = PCO_GAL;
-    input.OTHER.PCO.rec_GAL = PCO_rec_GAL;
-end
-if BDS_on
-    input.OTHER.PCO.sat_BDS = PCO_BDS;
-    input.OTHER.PCO.rec_BDS = PCO_rec_BDS;
-end
-if QZSS_on
-    input.OTHER.PCO.sat_QZSS = PCO_QZSS;
-    input.OTHER.PCO.rec_QZSS = PCO_rec_QZSS;
-end
+input.OTHER.PCO.sat_GLO = PCO_GLO;
+input.OTHER.PCO.rec_GLO = PCO_rec_GLO;
+input.OTHER.PCO.sat_GAL = PCO_GAL;
+input.OTHER.PCO.rec_GAL = PCO_rec_GAL;
+input.OTHER.PCO.sat_BDS = PCO_BDS;
+input.OTHER.PCO.rec_BDS = PCO_rec_BDS;
+input.OTHER.PCO.sat_QZSS = PCO_QZSS;
+input.OTHER.PCO.rec_QZSS = PCO_rec_QZSS;
 
 % save Phase Center Variations
 input.OTHER.PCV.sat_GPS = PCV_GPS;
 input.OTHER.PCV.rec_GPS = PCV_rec_GPS;
-if GLO_on
-    input.OTHER.PCV.sat_GLO = PCV_GLO;
-    input.OTHER.PCV.rec_GLO = PCV_rec_GLO;
-end
-if GAL_on
-    input.OTHER.PCV.sat_GAL = PCV_GAL;
-    input.OTHER.PCV.rec_GAL = PCV_rec_GAL;
-end
-if BDS_on
-    input.OTHER.PCV.sat_BDS = PCV_BDS;
-    input.OTHER.PCV.rec_BDS = PCV_rec_BDS;
-end
-if QZSS_on
-    input.OTHER.PCV.sat_QZSS = PCV_QZSS;
-    input.OTHER.PCV.rec_QZSS = PCV_rec_QZSS;
-end
-
+input.OTHER.PCV.sat_GLO = PCV_GLO;
+input.OTHER.PCV.rec_GLO = PCV_rec_GLO;
+input.OTHER.PCV.sat_GAL = PCV_GAL;
+input.OTHER.PCV.rec_GAL = PCV_rec_GAL;
+input.OTHER.PCV.sat_BDS = PCV_BDS;
+input.OTHER.PCV.rec_BDS = PCV_rec_BDS;
+input.OTHER.PCV.sat_QZSS = PCV_QZSS;
+input.OTHER.PCV.rec_QZSS = PCV_rec_QZSS;
 
 end
 
@@ -376,7 +330,7 @@ end
 
 %% AUXIALIARY FUNCTIONS
 function [freq, nr] = freque_name(string)
-% Convert the ANTEX frequency name to the frequency band and the raPPPid 
+% Convert the ANTEX frequency name to the frequency band and the raPPPid
 % number for saving
 switch string
     % --- GPS ---
@@ -422,7 +376,7 @@ switch string
     case 'C02'
         freq = 'B1';
         nr = 1;
-    case 'C05'        
+    case 'C05'
         freq = 'B2a';
         nr = 5;
     case 'C06'
@@ -481,9 +435,9 @@ end
 temp = lines( (i_start+1):(i_ende-1));
 i = i_ende;
 
-if numel(temp) == 1         % only NOAZI information
+if isscalar(temp)         % only NOAZI information
     data = temp{1};         % extract string with values
-    data_ = str2num(data(10:end));  % convert to number (works only with str2num)
+    data_ = str2num(data(10:end));  %#ok<ST2NM>, convert to number (works only with str2num)
     if numel(data_) == m
         mat(2,:) = data_;
     else                    % data does not fit into defined grid
@@ -531,13 +485,13 @@ end
 temp = lines( (i_start+1):(i_ende-1));
 i = i_ende;
 
-if numel(temp) == 1         % only NOAZI information
+if isscalar(temp)         % only NOAZI information
     data = temp{1};         % extract string with values
-    data_ = str2num(data(10:end));  % convert to number (works only with str2num)
+    data_ = str2num(data(10:end));  %#ok<ST2NM>, convert to number (works only with str2num)
     if numel(data_) == m
         mat(2,:) = data_;
     else                    % data does not fit into defined grid
-%         fprintf(2, 'Imperfection in *.atx-File: Data does not fit (readAntex.m)!\n')
+        %         fprintf(2, 'Imperfection in *.atx-File: Data does not fit (readAntex.m)!\n')
         mat(2,:) = data_(1:m);
     end
     mat = [[0;0], mat];    % build matrix

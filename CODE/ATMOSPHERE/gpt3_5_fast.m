@@ -200,6 +200,7 @@ for k = 1:nstat
     end
 
     % get the number of the corresponding line
+    indx = [0 0 0 0];                   % initialize
     indx(1) = (ipod - 1)*72 + ilon;
     
     % near the poles: nearest neighbour interpolation, otherwise: bilinear

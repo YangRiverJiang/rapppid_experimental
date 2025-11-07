@@ -9,7 +9,7 @@ function [] = AnalyzeObsFile(settings)
 %	...
 %
 % Revision:
-%   ...
+%   2025/08/14, MFWG: switch to cal2gpstime
 %
 % using distinguishable_colors.m (c) 2010-2011, Tim Holy
 % 
@@ -66,8 +66,8 @@ end
 % Start-date in different time-formats
 hour = obs.startdate(4) + obs.startdate(5)/60 + obs.startdate(6)/3660;
 obs.startdate_jd = cal2jd_GT(obs.startdate(1),obs.startdate(2), obs.startdate(3) + hour/24);
-[obs.startGPSWeek, obs.startSow, ~] = jd2gps_GT(obs.startdate_jd);
 [obs.doy, ~] = jd2doy_GT(obs.startdate_jd);
+[obs.startGPSWeek, obs.startSow] = cal2gpstime(obs.startdate);
 % print startdate of observation file
 fprintf('\nObservation start:\n')
 t = datetime(obs.startdate(1), obs.startdate(2), obs.startdate(3), ...
@@ -104,6 +104,8 @@ obs = find_obs_col(obs, settings);
 obs = SavePrintObsType(obs, settings);
 fprintf('\n');
 
+obs_count = zeros(5, max([length(obs.types_gps_3), length(obs.types_glo_3), length(obs.types_gal_3), length(obs.types_bds_3), length(obs.types_qzss_3)])/3);
+obs_missing = obs_count; 
 
 %% LOOP OVER OBSERVATION DATA
 for q = 1:n
@@ -132,6 +134,7 @@ for q = 1:n
     % GLONASS is not analzed correctly
     Epoch = RemoveSort(settings, Epoch, q);
     [Epoch, obs] = prepareObservations(settings, obs, Epoch);
+
     % save relevant data
     prns = Epoch.sats;
     % increase epoch counter
@@ -158,6 +161,16 @@ for q = 1:n
     % tracked satellites
     satellites.obs(q,prns)  = Epoch.tracked(prns);  	% save number of epochs satellite is tracked
 
+    % count observations for all observation types and each GNSS
+    if q == 1 && size(Epoch.obs, 2) > size(obs_count, 2)
+        obs_count = zeros(5, size(Epoch.obs, 2)); obs_missing = obs_count;
+    end
+    [obs_count, obs_missing] = countObservations(obs_count, obs_missing, 1, Epoch.gps, Epoch.obs);
+    [obs_count, obs_missing] = countObservations(obs_count, obs_missing, 2, Epoch.glo, Epoch.obs);
+    [obs_count, obs_missing] = countObservations(obs_count, obs_missing, 3, Epoch.gal, Epoch.obs);
+    [obs_count, obs_missing] = countObservations(obs_count, obs_missing, 4, Epoch.bds, Epoch.obs);
+    [obs_count, obs_missing] = countObservations(obs_count, obs_missing, 5, Epoch.qzss,Epoch.obs);
+    
     % handle waitbar
     if mod(q,5) == 0
         % Check for clicked Cancel button
@@ -169,6 +182,28 @@ end
 
 % kill waitbar
 delete(f)
+
+
+%% PERCENTAGE OF OBSERVATIONS
+perc = 100 - obs_missing./obs_count * 100;
+fprintf('\nPercentage of observations in RINEX file:')
+if settings.INPUT.use_GPS
+    fprintf('\nGPS:');     printObsPercentage(obs.types_gps_3, perc(1,:));
+end
+if settings.INPUT.use_GLO
+    fprintf('\nGLONASS:'); printObsPercentage(obs.types_glo_3, perc(2,:));
+end
+if settings.INPUT.use_GAL
+    fprintf('\nGalileo:'); printObsPercentage(obs.types_gal_3, perc(3,:));
+end
+if settings.INPUT.use_BDS
+    fprintf('\nBeiDou:');  printObsPercentage(obs.types_bds_3, perc(4,:));
+end
+if settings.INPUT.use_QZSS
+    fprintf('\nQZSS:');    printObsPercentage(obs.types_qzss_3,perc(5,:));
+end
+fprintf('\n\n')
+
 
 %% PLOTS
 rgb = createDistinguishableColors(40);      % colors for plot, no GNSS has more than 40 satellites
@@ -263,7 +298,44 @@ end
 fprintf('\n--------------------------------------------------------\n\n')
 
 
+%% AUXILIARY FUNCTIONS
+function [obs_count, obs_missing] = countObservations(obs_count, obs_missing, idx, bool_gnss, obsmatrix)
+% add number of observation, which should exist (equals #sats)
+obs_count(idx, :) = obs_count(idx, :) + sum(bool_gnss);     
+% determine how many observations are missing for all observation types
+obs_gnss = obsmatrix(bool_gnss, :);             % observation matrix for this GNSS
+missing = isnan(obs_gnss) | obs_gnss == 0;      % check for missing observations
+obs_missing(idx, :) = obs_missing(idx, :) + sum(missing);   % count missing observations
 
+function [] = printObsPercentage(obs_types, perc)
+% print the percentage of existing observations for all signals 
+if isempty(obs_types); fprintf('\n'); return; end
+% convert observation types to cell
+obs_types = cellstr(reshape(obs_types, 3, numel(obs_types)/3)');
+% extract the second character (RINEX frequency number)
+char_2 = cellfun(@(x) x(2), obs_types);
+% obtain the sorting index
+[~, idx] = sort(char_2);
+% Sort the observation types and percentages
+obs_types_ = obs_types(idx);
+perc = perc(idx);
+perc(perc < 0 | isnan(perc)) = 0;   % replace NaN and negative percentages with zero
+% loop to print to command window
+curr_frq = '0'; cc = 0;     % initialize current printed frequency and counter
+for i = 1 : numel(obs_types_)
+    % get observation type
+    type = obs_types_{i};
+    % potentially go to next line
+    if type(2) ~= curr_frq || mod(cc,5) == 0
+        fprintf('\n  ');
+        curr_frq = type(2); 
+        cc = 0;
+    end    
+    % print observation type and percentage
+    fprintf(type);
+    fprintf('% 7.2f%%,  ', perc(i));
+    cc = cc + 1;    % increase counter
+end
 
 function [] = print_obs_types(obs_type_string, v)
 % print observation types from RINEX header

@@ -41,7 +41,7 @@ for i = 1:n
         k = Epoch.BRDCcolumn(prn);
         IODE = input.ORBCLK.Eph_GPS(24,k);   % Issue of Data Ephemeris
     end    
-    [X(1:3,i),~,~] = satelliteOrbit(prn, Epoch.gps_time, input, isGPS, isGLO, isGAL, isBDS, isQZSS, k, settings, cutoff, status);
+    [X(1:3,i),~,~,~] = satelliteOrbit(prn, Epoch.gps_time, input, isGPS, isGLO, isGAL, isBDS, isQZSS, k, settings, cutoff, status);
 end
 
 

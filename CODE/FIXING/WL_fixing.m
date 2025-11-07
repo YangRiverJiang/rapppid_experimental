@@ -13,6 +13,9 @@ function Epoch = WL_fixing(HMW, Epoch, elev, intv, settings)
 % OUTPUT:
 %   Epoch           updated with WL ambiguities [struct]
 % 
+% Revision:
+%   2025/10/17, MFWG: QZSS fixing
+% 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
@@ -70,6 +73,13 @@ if settings.INPUT.use_BDS && any(Epoch.bds) && Epoch.refSatBDS ~= 0
     Epoch = fix_WL_MW(HMW, prns_bds, refSatBDS, Epoch, elev(Epoch.bds), epochs, settings);
 end
 
+
+%% QZSS
+if settings.INPUT.use_QZSS && any(Epoch.qzss) && Epoch.refSatQZS ~= 0
+    prns_qzs = Epoch.sats(Epoch.qzss);          % prns of QZSS satellites
+    refSatQZS = Epoch.refSatQZS;             	% Galileo reference satellite
+    Epoch = fix_WL_MW(HMW, prns_qzs, refSatQZS, Epoch, elev(Epoch.qzss), epochs, settings);
+end
 
 function Epoch = fix_WL_MW(HMW, prns, refSat, Epoch, elev, epochs, settings)
 % This function fixes the Wide-Lane-Ambiguity with the

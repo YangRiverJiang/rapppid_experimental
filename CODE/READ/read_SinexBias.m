@@ -18,7 +18,8 @@ function [BIAS] = read_SinexBias(BIAS, path, glo_channels)
 % constraint: different units - only cycles are handled and converted into [ns]
 % constraint: header is not read at all
 %
-%   Revision:
+% Revision:
+%   2025/08/14, MFWG: switch to cal2gpstime
 %   2025/06/02, MFWG: detect columns with header line (instead of version)
 %   2023/06/11, MFWG: adding QZSS 
 %
@@ -82,6 +83,8 @@ no_lines = length(lines);   % number of lines of file
 BIAS.Header.APC_MODEL = '';
 BIAS.Header.SAT_ANT_PCC_APPLIED = '';
 BIAS.Header.TimeSystem = '';
+BIAS.Header.SatClockRefObs_G = {}; BIAS.Header.SatClockRefObs_R = {};
+BIAS.Header.SatClockRefObs_E = {}; BIAS.Header.SatClockRefObs_C = {}; BIAS.Header.SatClockRefObs_J = {};
 
 % loop over header
 i = 1;
@@ -97,6 +100,17 @@ while bool
         apcmodel_string = strrep(curr_line, 'APC_MODEL', '');
         BIAS.Header.APC_MODEL = strtrim(strrep(apcmodel_string, '*', ''));
     end
+
+    if contains(curr_line, 'SATELLITE_CLOCK_REFERENCE_OBSERVABLES   G')
+        BIAS.Header.SatClockRefObs_G = split(strtrim(curr_line(44:end)));    end
+    if contains(curr_line, 'SATELLITE_CLOCK_REFERENCE_OBSERVABLES   R')
+        BIAS.Header.SatClockRefObs_R = split(strtrim(curr_line(44:end)));    end
+    if contains(curr_line, 'SATELLITE_CLOCK_REFERENCE_OBSERVABLES   E')
+        BIAS.Header.SatClockRefObs_E = split(strtrim(curr_line(44:end)));    end
+    if contains(curr_line, 'SATELLITE_CLOCK_REFERENCE_OBSERVABLES   C')
+        BIAS.Header.SatClockRefObs_C = split(strtrim(curr_line(44:end)));    end
+    if contains(curr_line, 'SATELLITE_CLOCK_REFERENCE_OBSERVABLES   J')
+        BIAS.Header.SatClockRefObs_J = split(strtrim(curr_line(44:end)));    end    
     
     if contains(curr_line, 'SATELLITE_ANTENNA_PCC_APPLIED_TO_MW_LC')
         BIAS.Header.SAT_ANT_PCC_APPLIED = strtrim(curr_line(40:end));
@@ -122,7 +136,7 @@ c_start = getColumn(headerline, c_spaces, 'BIAS_START');
 c_ende  = getColumn(headerline, c_spaces, 'BIAS_END');
 c_value = getColumn(headerline, c_spaces, 'ESTIMATED_VALUE');
 c_unit  = getColumn(headerline, c_spaces, 'UNIT');
-
+c_slope = getColumn(headerline, c_spaces, 'ESTIMATED_SLOPE');
 
 
 %% Handle data
@@ -143,9 +157,10 @@ while i < no_lines          % loop over data lines
         continue
     end
     
+    % get entries in of current line
     station = strtrim(curr_line(16:19));
-    [prn, obs_1, obs_2, sow_start, sow_ende, value, gpsweek_start, gpsweek_ende] = ...
-        read_line(curr_line, glo_channels, c_prn, c_obs1, c_obs2, c_start, c_ende, c_value, c_unit);        % get entries
+    [prn, obs_1, obs_2, sow_1, sow_2, value, gpsw_1, gpsw_2, slope] = ...
+        read_line(curr_line, glo_channels, c_prn, c_obs1, c_obs2, c_start, c_ende, c_value, c_unit, c_slope);        
     
     if contains(obs_1, '?') || contains(obs_2, '?') || (~isempty(station) && ~isvarname(station))
         % jump over lines which contains an unknown bias observable or
@@ -167,7 +182,7 @@ while i < no_lines          % loop over data lines
                 BIAS.(bias_type).(prn).(bias_field) = [];         % create field for this bias
             end
             BIAS.(bias_type).(prn).(bias_field) = ...
-                save_data_line(BIAS.(bias_type).(prn).(bias_field), value, round(sow_start), round(sow_ende), gpsweek_start, gpsweek_ende);
+                save_data_line(BIAS.(bias_type).(prn).(bias_field), value, round(sow_1), round(sow_2), gpsw_1, gpsw_2, slope);
         else
             % -) station entries:
             bias_field = [prn(1), obs_1, obs_2];  	% create field-name
@@ -179,7 +194,7 @@ while i < no_lines          % loop over data lines
                 BIAS.(bias_type).(station).(bias_field) = []; 	% create field for this bias
             end
             BIAS.(bias_type).(station).(bias_field) = ...
-                save_data_line(BIAS.(bias_type).(station).(bias_field), value, round(sow_start), round(sow_ende), gpsweek_start, gpsweek_ende);
+                save_data_line(BIAS.(bias_type).(station).(bias_field), value, round(sow_1), round(sow_2), gpsw_1, gpsw_2, slope);
         end
     end
     
@@ -193,15 +208,19 @@ end         % end of read_SinexBias
 function [col] = getColumn(headerline, c_spaces, keyword)
 % Detects the start and end column of a specific entry in the data block
 pos = strfind(headerline, keyword);
-a = c_spaces(c_spaces <= pos);
-e = c_spaces(c_spaces >= pos);
-col(1) = a(end);
-col(2) = e(1);
+if ~isempty(pos)
+    a = c_spaces(c_spaces <= pos);
+    e = c_spaces(c_spaces >= pos);
+    col(1) = a(end) + 1;
+    col(2) = e(1) - 1;
+else
+    col = [0 0];
+end
 end
 
 
 
-function [BiaStruct] = save_data_line(BiaStruct, value, sow_start, sow_ende, gpsweek_start, gpsweek_ende)
+function [BiaStruct] = save_data_line(BiaStruct, value, sow_start, sow_ende, gpsweek_start, gpsweek_ende, slope)
 % save values from one data line if there is a difference in bias value to
 % the last entry in the struct
 
@@ -211,6 +230,9 @@ if isempty(BiaStruct)                       % first call
     BiaStruct.ende(1)          = sow_ende;
     BiaStruct.start_gpsweek(1) = gpsweek_start;
     BiaStruct.ende_gpsweek(1)  = gpsweek_ende;
+    if ~isempty(slope)
+        BiaStruct.slope(1)         = slope;
+    end
     return
 end
 if BiaStruct.value(end) == value  	
@@ -226,24 +248,28 @@ else                                        % save new bias
     BiaStruct.ende(end+1)          = sow_ende;
     BiaStruct.start_gpsweek(end+1) = gpsweek_start;
     BiaStruct.ende_gpsweek(end+1)  = gpsweek_ende;
+    % slope is ignored here
 end
 end
 
 
-function [prn, obs_1, obs_2, sow_start, sow_ende, value, week_start, week_ende] = ...
-    read_line(curr_line, glo_channels, c_prn, c_obs1, c_obs_2, c_start, c_ende, c_value, c_unit)
+function [prn, obs_1, obs_2, sow_1, sow_2, value, week_1, week_2, slope] = ...
+    read_line(curr_line, glo_channels, c_prn, c_obs1, c_obs_2, c_start, c_ende, c_value, c_unit, c_slope)
 % function to read data from one line and convert date
 
 prn = strtrim(curr_line(c_prn(1):c_prn(2)));   % prn of current line
 
+slope = [];
 % extract data of current line
 obs_1 = strtrim(curr_line(c_obs1(1) :c_obs1 (2))); 	% observation type 1, string
 obs_2 = strtrim(curr_line(c_obs_2(1):c_obs_2(2))); 	% observation type 2, string
 start = strtrim(curr_line(c_start(1):c_start(2)));  % start time of bias correction
 ende  = strtrim(curr_line(c_ende(1) :c_ende (2)));  % end time of bias correction
-value = sscanf(strtrim(curr_line(c_value(1):c_value(2))),'%f');     % value of bias
-unit  = strtrim(curr_line(c_unit(1):c_unit(2)));          % unit of bias
-
+value = sscanf(strtrim(curr_line(c_value(1):c_value(2))),'%f');    % value of bias
+unit  = strtrim(curr_line(c_unit(1):c_unit(2)));    % unit of bias
+if length(curr_line) >= c_slope(2) && c_slope(1) ~= 0
+    slope = sscanf(strtrim(curr_line(c_slope(1):c_slope(2))),'%f');    % slope of bias
+end
 
 % check and correct if year is only in 2-digit format
 if ~strcmp(start(1:2), '20')
@@ -302,23 +328,24 @@ if strcmp(unit, 'cyc')
 
     end
     
-    value = value * lambda / Const.C * 10^9;    % from [cycles] to [ns]
-    
-end
+    % convert value and slope 
+    value = value * lambda / Const.C * 10^9;    % from [cycles]   to [ns] 
+    slope = slope * lambda / Const.C * 10^9;    % from [cycles/s] to [ns/s]
 
+end
 
 % convert start-date to sow
 yyyy_1  = sscanf(start(1:4), '%f');
 doy_1 = sscanf(start(6:8), '%f');
 sod_1 = sscanf(start(10:14), '%f');
-jd_1 = doy2jd_GT(yyyy_1, doy_1 + sod_1/86400);
-[week_start, sow_start, ~] = jd2gps_GT(jd_1);       % seconds of week and gps week of bias start
+cdate_start = datetime(yyyy_1,1,1) + days(doy_1-1) + seconds(sod_1);
+[week_1, sow_1] = cal2gpstime(cdate_start);
+
 % convert end-date to sow
 yyyy_2  = sscanf(ende(1:4), '%f');
 doy_2 = sscanf(ende(6:8), '%f');
 sod_2 = sscanf(ende(10:14), '%f');
-jd_2 = doy2jd_GT(yyyy_2, doy_2 + sod_2/86400);
-[week_ende, sow_ende, ~] = jd2gps_GT(jd_2);             % seconds of week and gps week of bias end
-sow_ende = sow_ende + (week_ende-week_start)*604800;     % handle week jump-over
-
+cdate_ende = datetime(yyyy_2,1,1) + days(doy_2-1) + seconds(sod_2);
+[week_2, sow_2] = cal2gpstime(cdate_ende);
+sow_2 = sow_2 + (week_2-week_1)*604800;     % handle week jump-over
 end

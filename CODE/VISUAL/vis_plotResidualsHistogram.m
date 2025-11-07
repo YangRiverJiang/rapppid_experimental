@@ -49,10 +49,10 @@ if ~isempty(glo_prns)
     for j = 1:no_frqs     % loop to plot all processed frequencies
         if all(all(NAN(:,glo_prns,j))); i_plot = i_plot + 1 + bool_phase; continue; end
         subplot(no_rows, no_cols, i_plot); i_plot = i_plot + 1;
-        plotCodeHisto(Code_res(:,glo_prns,j), 'Glonass', sprintf('%d', j), [1 0 1])
+        plotCodeHisto(Code_res(:,glo_prns,j), 'GLONASS', sprintf('%d', j), [1 0 1])
         if ~isempty(Phase_res) && bool_phase
             subplot(no_rows, no_cols, i_plot); i_plot = i_plot + 1;
-            plotPhaseHisto(Phase_res(:,glo_prns,j), 'Glonass', sprintf('%d', j), [0.5 0.0 0.5])
+            plotPhaseHisto(Phase_res(:,glo_prns,j), 'GLONASS', sprintf('%d', j), [0.5 0.0 0.5])
         end
     end
 end

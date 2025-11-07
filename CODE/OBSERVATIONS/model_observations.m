@@ -32,7 +32,7 @@ no_sats = numel(Epoch.sats);   	% number of satellites
 % If ionosphere is estimated use estimated ionospheric delay instead of 
 % modelled ionospheric delay to model the observation
 iono = model.iono;
-if contains(settings.IONO.model,'Estimate')
+if contains(settings.IONO.model, 'Estimate')
     n = numel(param_);
     idx = (n-no_sats+1):n;
     iono = param_(idx);   % estimated ionospheric delay on 1st frequency
@@ -73,8 +73,9 @@ if contains(settings.PROC.method,'+ Phase')
     % get current float ambiguities
     idx = (NO_PARAM+1):(NO_PARAM+no_sats*proc_freq);
     ambig = param_(idx);
-    ambig = reshape(ambig, [length(ambig)/proc_freq , proc_freq, 1]);     % convert from vector to matrix
-    
+    ambig = reshape(ambig, [length(ambig)/proc_freq , proc_freq, 1]);   % convert from vector to matrix
+    if strcmp(settings.IONO.model, 'GRAPHIC'); ambig = ambig/2; end     % GRAPHIC: divide ambiguity by 2      
+
     phase_model = model.rho...                            	% theoretical range
         - Const.C * model.dT_sat_rel...                    	% satellite and receiver clock
         + model.dt_rx_clock - model.dcbs ...                % receiver clock and DCBs

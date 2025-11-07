@@ -12,6 +12,9 @@ function XYZ = get_weekly_IGS_coordinates(stations, dates, XYZ, coordsyst)
 % OUTPUT:
 %   XYZ         [n x 3], true coordinates for each station and corresponding day
 %
+% Revision:
+%   ...
+% 
 % This function belongs to raPPPid, Copyright (c) 2024, M.F. Wareyka-Glaner
 % *************************************************************************
 
@@ -32,7 +35,7 @@ else
     xyz_found = all(abs(XYZ) > 1e4, 2);  
 end
 
-% loop over all files
+% loop over all stations
 for i = 1:n
     if all(xyz_found)     % check if all true coordinates are found
         return
@@ -80,7 +83,7 @@ for i = 1:n
     URL_folder2  = ['/gnss/products/' gpsweek_str '/'];
     cddis_folder = ['/archive/gnss/products/' gpsweek_str];
     switch sys
-        case {'IGS14', 'IGb14', ''}													  
+        case {'IGS14', 'IGb14', 'IGS08', 'IGb08', 'IGS05', 'IGb05', ''}	
             file = ['igs' yyyy0_str(3:4) 'P' gpsweek_str '.ssc.Z'];
             cddis_file = ['IGS' yyyy0_str(3:4) 'P' ww '.ssc.Z'];
             if gpsweek > 2237

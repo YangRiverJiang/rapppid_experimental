@@ -37,6 +37,20 @@ for j = 1:no_frqs
     N_j = full(storeData.(field)(:,idx_gnss));
     N_j(N_j==0) = NaN;              % replace zeros with NaN
     
+    % prepare plotting
+    prn_idx = (sum(~isnan(N_j)) > 0);   % satellites which have data, logical vector
+    if strcmp(settings.IONO.model, 'Estimate, decoupled clock')
+        % make sure that reference satellites' ambiguity is plotted (DCM)
+        refsats = mod(unique(storeData.(['refSat' char2gnss3(gnss)])), 100);
+        refsats(refsats==0) = [];       % ignore 0 
+        prn_idx(refsats) = true;
+    end    
+    prns = 1:no_sats;
+    prns = prns(prn_idx);       % prns with data
+    k = 0;
+
+    if all(prn_idx == 0);  continue; end
+    
     % in the case of the decoupled clock model the float ambiguity of the
     % reference satellite is not estimated and set to zero
     if contains(settings.IONO.model, 'Estimate, decoupled clock')
@@ -49,12 +63,6 @@ for j = 1:no_frqs
         N_j(ind) = 0;       
     end
 
-    % prepare plotting
-    prn_idx = (sum(~isnan(N_j)) > 0);   % satellites which have data, logical vector
-    prns = 1:no_sats;
-    prns = prns(prn_idx);       % prns with data
-    k = 0;
-    
     % plotting
     subplot(no_frqs,1,j)
     hold on

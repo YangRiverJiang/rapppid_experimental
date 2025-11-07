@@ -1,11 +1,7 @@
 function xyz = ApproximatePosition(Epoch, input, obs, settings)
-% This function calculates an approximate position with a rather simple 
-% code only solution. The accuracy of this approximate position should be 
-% at least some meters and therefore definitely enough for the PPP filtering.
-% If no IF-LC is processed receiver DCBs are not considered in the 
-% Design-Matrix as nevertheless m-level accuracy should be reached.
-% Alternatively only C1 observation could be used.
-% QZSS is ignored
+% This function calculates an approximate position with a simple code-only 
+% solution. The accuracy of this approximate position should be sufficient 
+% for PPP filtering. Some parameters and error sources are ignored.
 % 
 % INPUT:
 %   Epoch           struct, epoch-specific data
@@ -29,12 +25,13 @@ for iteration = 1:10
     cutoff = Epoch.exclude(:);
     model_code = model.rho...            	% theoretical distance
         - Const.C * model.dT_sat_rel ...  	% satellite clock
-        + param(7)*Epoch.gps + param(8)*Epoch.glo ....  % receiver clock
-        + param(9)*Epoch.gal + param(10)*Epoch.bds .... % receiver clock
-        + model.trop + model.iono...            	% atmosphere
-        - model.dX_PCO_rec_corr...             		% Phase Center Offset Receiver
-        - model.dX_ARP_ECEF_corr...                 % Antenna Reference Point Receiver
-        + model.dX_PCO_sat_corr;               		% Phase Center Offset Satellite
+        + param(7)*Epoch.gps + param(8)*Epoch.glo ....  % receiver clock error (GPS + GLO)
+        + param(9)*Epoch.gal + param(10)*Epoch.bds ...  % receiver clock error (GAL + BDS)
+        + param(11)*Epoch.qzss ....                     % receiver clock error (QZSS)
+        + model.trop + model.iono...        % atmosphere
+        - model.dX_PCO_rec_corr...          % Phase Center Offset Receiver
+        - model.dX_ARP_ECEF_corr...         % Antenna Reference Point Receiver
+        + model.dX_PCO_sat_corr;            % Phase Center Offset Satellite
 
     % observed minus computed
     omc = (Epoch.code(:) - model_code(:)) .* ~cutoff;
@@ -55,12 +52,11 @@ for iteration = 1:10
     dR_dt_GAL   = repmat(1*Epoch.gal,  n_freq, 1) .* ~cutoff;
     dR_dt_BDS   = repmat(1*Epoch.bds,  n_freq, 1) .* ~cutoff;
     dR_dt_QZSS  = repmat(1*Epoch.qzss, n_freq, 1) .* ~cutoff;
-    
     % Build Design-Matrix
     A = [dR_dx, dR_dy, dR_dz, dR_dvx, dR_dvy, dR_dvz, dR_dt_GPS, dR_dt_GLO, dR_dt_GAL, dR_dt_BDS, dR_dt_QZSS];
     
     % Build Weight-Matrix
-    P_diag = createWeights(Epoch, model.el, settings);
+    P_diag = createWeights(Epoch, model.el, settings, model.bore);
     P_diag = P_diag(:,1:n_freq);      % e.g., IF LC processed
     P = diag(P_diag(:));
     
@@ -72,8 +68,7 @@ for iteration = 1:10
 
     % Stop iterations in case of coordinate convergence on dm-level
     if norm(dx.x(1:3)) < 1e-1
-        xyz = param(1:3);
-        return;
+        break;
     end
     
 end

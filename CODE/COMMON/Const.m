@@ -134,6 +134,8 @@ classdef Const
         
         
         %% Reference systems
+        % start of GPS time as datetime
+        GPS_timestart = datetime([1980 1 6 0 0 0], 'Format', 'dd MMM yyyy HH:mm:ss.SSS');
         % WGS84 parameters
         WGS84_A = 6378137.0;                % semimajor axis [m]
         WGS84_E_SQUARE = 6.69437999013 * 10^(-3);

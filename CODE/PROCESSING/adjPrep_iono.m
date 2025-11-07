@@ -71,7 +71,7 @@ if Adjust.float
     % check if satellite geometry has changed
     if ~isequal(prns, prns_old)         
         % delete ambiguities of vanished satellites
-        del_idx = [];
+        del_idx = zeros(1,0);
         for i = 1:no_sats_old                           % loop over satellites of last epoch
             if isempty(find(prns_old(i) == prns,1))     % find indices of vanished satellites
                 del_idx(end+1) = i;
@@ -104,7 +104,7 @@ if Adjust.float
     % test if satellite constellation is (still) different
     if ~isequal(prns, prns_old)     
         % insert ambiguities and ionospheric delays (value=0) for new satellites
-        ins_idx = [];
+        ins_idx = zeros(1,0);
         for i = 1:no_sats                               % loop over satellites of current epoch
             if isempty(find(prns(i) == prns_old,1))  	% find indices of new satellites
                 ins_idx(end+1) = i;

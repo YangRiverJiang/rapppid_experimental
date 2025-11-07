@@ -87,13 +87,14 @@ end
 
 
 %% interpolate GDV correction for elevation of satellite
+dX_GDV_ = [0 0 0];
 dX_GDV_(1) = interp1(GDV(:,1), GDV(:,2), el);
 dX_GDV_(2) = interp1(GDV(:,1), GDV(:,3), el);
 dX_GDV_(3) = interp1(GDV(:,1), GDV(:,4), el);
 
 
 %% consider processed frequency
-if strcmpi(IONO_model,'2-Frequency-IF-LCs')
+if strcmpi(IONO_model,'2-Frequency-IF-LCs')     % ||| replace with Convert2ProcFrqs.m
     % convert to frequency of 2-Frequency-IF-LCs
     dX_GDV(1) = -(f1^2*dX_GDV_(j(1))-f2^2*dX_GDV_(j(2))) / (f1^2-f2^2);
     if n > 1

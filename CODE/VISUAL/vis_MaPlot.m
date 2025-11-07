@@ -23,8 +23,8 @@ function [] = vis_MaPlot(lat, lon, bool_true_pos, lat_true, lon_true, station_da
 fig_map = figure('Name','Map Plot', 'units','normalized', 'outerposition',[0 0 1 1], 'NumberTitle','off', 'Color', 'w');
 hold on
 % set view
-if numel(lon) > 1;    xlim([min(lon(lon~=0)) max(lon(lon~=0))]);    end
-if numel(lat) > 1;    ylim([min(lat(lat~=0)) max(lat(lat~=0))]);    end
+if numel(lon) > 1 && any(~isnan(lon)); xlim([min(lon(lon~=0)) max(lon(lon~=0))]); end
+if numel(lat) > 1 && any(~isnan(lat)); ylim([min(lat(lat~=0)) max(lat(lat~=0))]); end
 
 % change axis limits depending on difference between the coordinates
 delta_lam = max(lon) - min(lon);            % [°], difference in longitude

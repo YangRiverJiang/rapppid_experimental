@@ -1,19 +1,20 @@
-function P_diag = createWeights(Epoch, elev, settings)
-% Function to create the weights of the observations for the diagonal of 
+function P_diag = createWeights(Epoch, elev, settings, bore)
+% Function to create the weights of the observations for the diagonal of
 % the weighting matrix P or, in other words, the weight factors for the
 % variance of the observations.
 % Variants:
 % -) weight the observations depending on the procedure described in [02]
 % -) weight the observations depending on the elevation of their satellites
 % -) weight the observations depending on their signal strength on 1st frequency
-% 
+%
 % INPUT:
 %   Epoch           containing epoch-specific data
-%   elev            elevation of the satellites of current epoch [°]
+%   elev            elevation to GNSS satellites of current epoch [°]
 %   settings        setting of proceesing from GUI
+%   bore            boresight angle to GNSS satellites of current epoch [°]
 % OUTPUT:
 %   P_diag          [n sats x input freqs], weight for each satellite and frequency
-% 
+%
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
@@ -24,36 +25,23 @@ P_diag = ones(n_sats,num_freq);
 elev = elev*pi/180; 	% elevation of satellites of this epoch [rad]
 elev_n = repmat(elev(:,1),1,num_freq);      % elevation is equal on all frequencies
 
-% --- Weighting depending on combination of elevation and MP-LC, check [02]
-if settings.ADJ.weight_mplc
-    if Epoch.q > 5
-        w1 = tanh((Epoch.mp1_var.^-1)/100)' + sin(elev);
-        w2 = tanh((Epoch.mp2_var.^-1)/100)' + sin(elev);
-        w = (w1+w2)/2;
-        % variance = NaN (e.g. satellite is not observed for 5 epochs),
-        % weight according to sqrt(elevation)
-        w(isnan(w)) = sqrt(elev(isnan(w)));
-        P_diag(:,1) = w;
-        P_diag(:,2) = w;
-    else        % not enough epochs to calculate variance so weight depending on elevation
-        P_diag = sin(elev_n).^2;
-    end
-    
-    
-    % --- Weighting according to elevation
-elseif settings.ADJ.weight_elev
+
+
+% --- Weighting according to elevation
+if settings.ADJ.weight_elev
     % observations on different frequencies get same weight factor
-    P_diag(:,:) = settings.ADJ.elev_weight_fun(elev_n);       
-    
-    
-    % --- No weighting of the observations
-elseif settings.ADJ.weight_none
-    P_diag(:,:) = 1;
-    
-    
-    % --- Weighting using signal to noise ratio (e.g., low-cost equipment), check [05]
+    if isa(settings.ADJ.elev_weight_fun, 'function_handle')
+        P_diag(:,:) = settings.ADJ.elev_weight_fun(elev_n);
+    elseif strcmp(settings.ADJ.elev_weight_fun, 'option_0')
+        P_diag = sin(elev_n).^2;        % option_0 is sin(e)^2
+    else
+        fprintf(2, '\nError in createWeights!\n')
+    end
+
+
+
 elseif settings.ADJ.weight_sign_str
-    
+    % --- Weighting using signal to noise ratio (e.g., low-cost equipment), check [05]
     if ischar(settings.ADJ.snr_weight_fun)
         % hardcoded C/N0 weighting function
         switch settings.ADJ.snr_weight_fun
@@ -67,9 +55,17 @@ elseif settings.ADJ.weight_sign_str
                 if ~isempty(Epoch.S3) && settings.INPUT.proc_freqs >= 3
                     P_diag = goGPS_SNR_weighting(P_diag, Epoch.S3, 3);
                 end
+            case 'option_0'
+                % option_0 = 10.^-(max([55-snr,0])./10)
+                SNR = [Epoch.S1, Epoch.S2, Epoch.S3];
+                expo = 55 - SNR;
+                expo(expo < 0 | isnan(expo)) = 0;
+                expo = expo ./ 10;
+                P_diag = 10 .^ -expo;
+            otherwise
+                fprintf(2, '\nError in createWeights!\n')
         end
-        
-    else
+    elseif isa(settings.ADJ.snr_weight_fun, 'function_handle')
         % C/N0 weighting function from GUI (user input)
         SNR = [Epoch.S1, Epoch.S2, Epoch.S3];
         if contains(func2str(settings.ADJ.snr_weight_fun), 'max(')
@@ -81,8 +77,8 @@ elseif settings.ADJ.weight_sign_str
             end
         else
             P_diag(:,:) = settings.ADJ.snr_weight_fun(SNR);
-            if settings.INPUT.proc_freqs >= 2 
-                % replace missing values 
+            if settings.INPUT.proc_freqs >= 2
+                % replace missing values
                 P_diag_1 = P_diag(:,1);
                 P_diag_2 = P_diag(:,2);
                 bool = isnan(P_diag_2) | P_diag_2 == 0;
@@ -90,17 +86,48 @@ elseif settings.ADJ.weight_sign_str
                 P_diag(:,2) = P_diag_2;
             end
             if settings.INPUT.proc_freqs >= 3
-                % replace missing values 
+                % replace missing values
                 P_diag_3 = P_diag(:,3);
                 bool = isnan(P_diag_3) | P_diag_3 == 0;
                 P_diag_3(bool) = P_diag_1(bool);
                 P_diag(:,3) = P_diag_3;
             end
         end
-    end  
-    
+    end
     % ||| check for multi-frequency processing
     % ||| check for IF LC (which S1 to take?)
+
+
+
+elseif settings.ADJ.weight_bore
+    % --- Weighting according to antenna boresight angle
+    bore(isnan(bore)) = 0;                  % might happen in first epoch
+    w = (1 + cos(pi * bore / 180)) / 2;     % w = 1 for 0°, w = 0 for 180°
+    P_diag = repmat(w, 1, num_freq);
+
+
+
+    % --- No weighting of the observations
+elseif settings.ADJ.weight_none
+    P_diag(:,:) = 1;
+
+
+
+elseif settings.ADJ.weight_mplc
+    % --- Weighting depending on combination of elevation and MP-LC, check [02]
+    if Epoch.q > 5
+        w1 = tanh((Epoch.mp1_var.^-1)/100)' + sin(elev);
+        w2 = tanh((Epoch.mp2_var.^-1)/100)' + sin(elev);
+        w = (w1+w2)/2;
+        % variance = NaN (e.g. satellite is not observed for 5 epochs),
+        % weight according to sqrt(elevation)
+        w(isnan(w)) = sqrt(elev(isnan(w)));
+        P_diag(:,1) = w;
+        P_diag(:,2) = w;
+    else        % not enough epochs to calculate variance so weight depending on elevation
+        P_diag = sin(elev_n).^2;
+    end
+
 
 end
 
@@ -112,8 +139,8 @@ P_diag(Epoch.gal,:) = P_diag(Epoch.gal,:) / settings.ADJ.fac_GAL;
 P_diag(Epoch.bds,:) = P_diag(Epoch.bds,:) / settings.ADJ.fac_BDS;
 
 % very low weigth for weights which are NaN, zero, or negative
-P_diag(isnan(P_diag)) = 10^-6;      
-P_diag(P_diag <= 0) = 10^-6;    
+P_diag(isnan(P_diag)) = 10^-6;
+P_diag(P_diag <= 0) = 10^-6;
 
 end
 
@@ -122,8 +149,8 @@ end
 
 
 function P_diag = goGPS_SNR_weighting(P_diag, SNR, frq)
-% Creating weights depending on Carrier-to-Noise density following [05]: (5.1) 
-% 
+% Creating weights depending on Carrier-to-Noise density following [05]: (5.1)
+%
 % INPUT:
 %   P_diag      values for diagonal of weight matrix P
 %   C/N0        Carrier-to-Noise Density of current frequency

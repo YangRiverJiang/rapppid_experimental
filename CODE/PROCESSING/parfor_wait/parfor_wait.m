@@ -53,7 +53,7 @@ classdef parfor_wait < handle
             if Obj.Waitbar
                 % adapted (MFG):
                 mess_str2 = ['Start time: ' datestr(clock, 'HH:MM:SS')];
-                mess_str = {'1st iterations.', mess_str2};
+                mess_str = {'First iterations.', mess_str2};
                 Obj.WaitbarHandle = waitbar(0, mess_str, 'Name', 'Batch Processing Progress', 'Resize', true);
             end
             switch Obj.FileName

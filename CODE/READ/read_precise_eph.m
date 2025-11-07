@@ -1,6 +1,5 @@
 function [GPS, GLO, GAL, BDS, QZSS] = read_precise_eph(filename, bool_check)
 % Reads precise ephemerides for GPS, GLO, GAL, BDS and QZSS from sp3 file
-% This function is part of raPPPid (VieVS PPP)
 % 
 % INPUT:
 % 	filename        string with path and name of .sp3 file
@@ -17,8 +16,9 @@ function [GPS, GLO, GAL, BDS, QZSS] = read_precise_eph(filename, bool_check)
 % 
 %       GLO, GAL, BDS, and QZSS: structs, same structure as GPS
 %  
-%   Revision:
+% Revision:
 %   2023/11/03, MFWG: adding QZSS
+%   2025/08/14, MFWG: switch to cal2gpstime
 % 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -47,10 +47,8 @@ while i <= no_lines         % loop till end of file
     if tline(1) ~= '*'
         continue
     end
-    epochheader = sscanf(tline,'%*c %f %f %f %f %f %f');      % start with epoch header (always in GPS time)
-    date = epochheader;
-    jd = cal2jd_GT(date(1), date(2), date(3) + date(4)/24 + date(5)/1440 + date(6)/86400);
-    [~, sow,~] = jd2gps_GT(jd);
+    date = sscanf(tline,'%*c %f %f %f %f %f %f');      % start with epoch header (always in GPS time)
+    [~, sow] = cal2gpstime(date');
     idx = idx + 1;          % increase epoch index
     
     
@@ -123,7 +121,7 @@ QZSS = checkPrecEph(QZSS, DEF.SATS_QZSS, bool_check);
 
 % save-function for position
 function GNSS = save_position(GNSS, i, prn, sow, X, Y, Z, dT)
-GNSS.t (i, prn)	= round(sow);
+GNSS.t (i, prn)	= sow;
 GNSS.X (i, prn)	= X*1000;       % [km] to [m]
 GNSS.Y (i, prn)	= Y*1000;
 GNSS.Z (i, prn) = Z*1000;
@@ -131,7 +129,7 @@ GNSS.dT(i, prn) = dT;
 
 % save-function for velocity
 function GNSS = save_velocity(GNSS, i, prn, sow, X, Y, Z, dT)
-GNSS.t_vel (i, prn)	= round(sow);
+GNSS.t_vel (i, prn)	= sow;
 GNSS.X_vel (i, prn)	= X/10;     % [dm/s] to [m/s]
 GNSS.Y_vel (i, prn)	= Y/10;
 GNSS.Z_vel (i, prn) = Z/10;

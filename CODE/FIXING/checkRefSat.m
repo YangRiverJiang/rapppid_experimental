@@ -18,14 +18,23 @@ function [newRefSat, changeRefSat] = checkRefSat(Epoch, settings, elev)
 % *************************************************************************
 
 
-%% initialize variables
+%% prepare variables
 newRefSat    = false(1,5);     % GPS, GLO, GAL, BDS, QZSS
 changeRefSat = false(1,5);     % GPS, GLO, GAL, BDS, QZSS
 
-kill = any(Epoch.exclude | Epoch.cs_found | ~Epoch.fixable, 2);
-kill_GLO = any(Epoch.exclude | Epoch.cs_found, 2);      % GLONASS satellites are usually not fixable
-
 HighestSat = strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite');
+
+
+%% check for irregularieties
+
+% GLONASS satellites are generally not fixable -> ignore criterium for them
+fixable = Epoch.fixable | Epoch.glo;    
+
+% check for missing observations
+bool_all = check_all_obs(Epoch, settings.INPUT.n_gnss_freqs, settings.INPUT.use_GPS, settings.INPUT.use_GLO, settings.INPUT.use_GAL, settings.INPUT.use_BDS, settings.INPUT.use_QZSS);
+
+% check some criteria for irregularities which should not occur for ref sat
+bad = any(Epoch.exclude | Epoch.cs_found | ~fixable | ~bool_all, 2); 
 
 
 %% check reference satellites
@@ -33,31 +42,31 @@ HighestSat = strcmp(settings.AMBFIX.refSatChoice, 'Highest satellite');
 % GPS
 if settings.INPUT.use_GPS
     [newRefSat, changeRefSat] = checkRefSat_GNSS(newRefSat, changeRefSat, ...
-        HighestSat, Epoch.refSatGPS, Epoch.refSatGPS_idx, elev, Epoch.gps, Epoch.sats, kill, 1);
+        HighestSat, Epoch.refSatGPS, Epoch.refSatGPS_idx, elev, Epoch.gps, Epoch.sats, bad, 1);
 end
 
 % GLONASS
 if settings.INPUT.use_GLO
     [newRefSat, changeRefSat] = checkRefSat_GNSS(newRefSat, changeRefSat, HighestSat, ...
-        Epoch.refSatGLO, Epoch.refSatGLO_idx, elev, Epoch.glo, Epoch.sats, kill_GLO, 2);
+        Epoch.refSatGLO, Epoch.refSatGLO_idx, elev, Epoch.glo, Epoch.sats, bad, 2);
 end
 
 % Galileo
 if settings.INPUT.use_GAL
     [newRefSat, changeRefSat] = checkRefSat_GNSS(newRefSat, changeRefSat, HighestSat, ...
-        Epoch.refSatGAL, Epoch.refSatGAL_idx, elev, Epoch.gal, Epoch.sats, kill, 3);
+        Epoch.refSatGAL, Epoch.refSatGAL_idx, elev, Epoch.gal, Epoch.sats, bad, 3);
 end
 
 % BeiDou
 if settings.INPUT.use_BDS
     [newRefSat, changeRefSat] = checkRefSat_GNSS(newRefSat, changeRefSat, HighestSat, ...
-        Epoch.refSatBDS, Epoch.refSatBDS_idx, elev, Epoch.bds, Epoch.sats, kill, 4);
+        Epoch.refSatBDS, Epoch.refSatBDS_idx, elev, Epoch.bds, Epoch.sats, bad, 4);
 end
 
 % QZSS
 if settings.INPUT.use_QZSS
     [newRefSat, changeRefSat] = checkRefSat_GNSS(newRefSat, changeRefSat, ...
-    HighestSat, Epoch.refSatQZS, Epoch.refSatQZS_idx, elev, Epoch.qzss, Epoch.sats, kill, 5);
+    HighestSat, Epoch.refSatQZS, Epoch.refSatQZS_idx, elev, Epoch.qzss, Epoch.sats, bad, 5);
 end
 
 
@@ -92,3 +101,9 @@ else
     % currently no reference satellite for this GNSS
     newRefSat(i) = true;
 end
+
+
+
+
+
+

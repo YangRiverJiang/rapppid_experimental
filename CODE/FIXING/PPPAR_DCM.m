@@ -1,6 +1,6 @@
 function [Epoch, Adjust] = PPPAR_DCM(Adjust, Epoch, settings)
-% Fix ambiguities and calculating fixed position with the decoupled clock
-% model.
+% This function integer fixes the ambiguities and calculates the fixed
+% solution within the decoupled clock model.
 %
 % INPUT:
 % 	Adjust          adjustment data and matrices for current epoch [struct]
@@ -17,128 +17,88 @@ function [Epoch, Adjust] = PPPAR_DCM(Adjust, Epoch, settings)
 % *************************************************************************
 
 
-
-%% get some variables
-
 NO_PARAM = Adjust.NO_PARAM;             % number of estimated parameters
 no_sats = numel(Epoch.sats);          	% number of satellites in current epoch
 proc_frqs = settings.INPUT.proc_freqs; 	% number of processed frequencies
-s_f = no_sats*proc_frqs;             	% #satellites x #frequencies
-idx_N = NO_PARAM+1 : NO_PARAM+s_f;      % indices of float ambiguities
 
 
 
-%% float ambiguities
-
-% indices of frequencies
-idx_N1 = (NO_PARAM +             1):(NO_PARAM +   no_sats);     % 1st frequency
-idx_N2 = (NO_PARAM +   no_sats + 1):(NO_PARAM + 2*no_sats);     % 2nd frequency
-idx_N3 = (NO_PARAM + 2*no_sats + 1):(NO_PARAM + 3*no_sats);     % 3rd frequency
-
-% get float ambiguities and convert from meters to cycles
-N1 = Adjust.param(idx_N1);          % 1st frequency
-N1_cy = N1 ./ Epoch.l1;
-if proc_frqs >= 2
-    N2 = Adjust.param(idx_N2);      % 2nd frequency
-    N2_cy = N2 ./ Epoch.l2;
-end
-if proc_frqs >= 3
-    N3 = Adjust.param(idx_N3);      % 3rd frequency
-    N3_cy = N3 ./ Epoch.l3;
-end
-
-% stack all ambiguities in one vector
-N_cy = N1_cy;
-if proc_frqs == 2
-    N_cy = [N1_cy; N2_cy];
-elseif proc_frqs == 3
-    N_cy = [N1_cy; N2_cy; N3_cy];
-end
-
-
-
-
-
-%% covariance matrix
-
-% covariance matrix of float ambiguities [m]
-Q_NN = Adjust.param_sigma(idx_N, idx_N);  
-
-% wavelength of all observations
-wl = Epoch.l1;
-if proc_frqs == 2
-    wl = [Epoch.l1; Epoch.l2;];
-elseif proc_frqs == 3
-    wl = [Epoch.l1; Epoch.l2; Epoch.l3];
-end
-
-% convert unit of covariance matrix from meters to cycles
-Q_NN = Q_NN ./ wl;          % divide rows by wavelength
-Q_NN = Q_NN ./ wl';         % divide columns by wavelength
-Q_NN = (Q_NN + Q_NN')./2;   % due to numerical reasons after the division
-
-
-
-%% exclude unfixable ambiguities
-fixit = Epoch.fixable & ~Epoch.exclude; 	% boolean, can phase ambiguity be fixed?
-
-% exclude reference satellites from fixing
-fixit(Epoch.refSatGPS_idx,:) = false;
-fixit(Epoch.refSatGLO_idx,:) = false;
-fixit(Epoch.refSatGAL_idx,:) = false;
-fixit(Epoch.refSatBDS_idx,:) = false;
-fixit(Epoch.refSatQZS_idx,:) = false;
-
-% exclude ambiguities with invalid observations
-fixit(isnan(Epoch.code(:) ) | Epoch.code(:)  == 0) = false;
-fixit(isnan(Epoch.phase(:)) | Epoch.phase(:) == 0) = false;
-
-% exclude GLONASS satellites from fixing
-fixit(Epoch.glo, :) = false;
-
-fixit = fixit(:);
-
-
-
-%% Fixing with LAMBDA 
-
-% extract only fixable ambiguities and corresponding parts of
-% covariance matrix on 1st frequency for fixing with LAMBDA
-N_sub = N_cy(fixit);
-Q_NN_sub = Q_NN(fixit, fixit);
-
-% check if any ambiguities can be fixed at all
-if all(~fixit)
+%% fix the ambiguities
+if Adjust.fix_now(1)
+    [Epoch, Adjust] = DCM_fixing(Adjust, Epoch, settings);
+else
+    % ambiguity fixing has not started yet
+    Adjust.param_fix(1:3) = NaN;
+    Adjust.fixed = false;
     return
 end
 
-% integer fixing with LAMBDA 
-[N_sub_fixed, sqnorm] = LAMBDA(N_sub, Q_NN_sub, 5, 3, DEF.AR_THRES_SUCCESS_RATE);
+% get fixed ambiguities and convert from [cycles] to [meter]
+N1_fix = Adjust.N1_fixed .* Epoch.l1;
+N2_fix = Adjust.N2_fixed .* Epoch.l2;
+N3_fix = Adjust.N3_fixed .* Epoch.l3;
+% set fixed ambiguity of reference satellites to NaN
+N1_fix(Epoch.refSatGPS_idx) = NaN;
+N1_fix(Epoch.refSatGAL_idx) = NaN;
+N1_fix(Epoch.refSatBDS_idx) = NaN;
+N2_fix(Epoch.refSatGPS_idx) = NaN;
+N2_fix(Epoch.refSatGAL_idx) = NaN;
+N2_fix(Epoch.refSatBDS_idx) = NaN;
+N3_fix(Epoch.refSatGPS_idx) = NaN;
+N3_fix(Epoch.refSatGAL_idx) = NaN;
+N3_fix(Epoch.refSatBDS_idx) = NaN;
+% put fixed ambiguities on all frequencies together
+N_fixed = N1_fix;
+if proc_frqs == 2
+    N_fixed = [N1_fix; N2_fix];
+elseif proc_frqs == 3
+    N_fixed = [N1_fix; N2_fix; N3_fix];
+end
 
-% get best ambiguity set and keep only integer fixes
-N_fix_sub = N_sub_fixed(:,1);
-bool_int = (N_fix_sub - floor(N_fix_sub)) == 0;
-N_fix_sub(~bool_int) = NaN;
 
-% consider removed (unfixable) satellites
-N_(fixit) = N_fix_sub;
-N_(~fixit) = NaN;
 
-% convert ambiguity vectors to matrix and set fixed ambiguities of
-% reference satellites to zero
-N_ = reshape(N_, [no_sats proc_frqs]);
-N_(Epoch.refSatGPS_idx,:) = 0;
-% N_(Epoch.refSatGLO_idx,:) = 0;
-N_(Epoch.refSatGAL_idx,:) = 0;
-N_(Epoch.refSatBDS_idx,:) = 0;
-N_(Epoch.refSatQZS_idx,:) = 0;
+%% calculate the fixed solution
+if sum( ~isnan(N_fixed(:)) ) >= 3  	% ||| check condition
 
-% save fixed ambiguities in a matrix [n_sats x 3]
-N__ = NaN(no_sats, 3);
-N__(:,1:proc_frqs) = N_;
+    s_f = no_sats*proc_frqs;             	% #satellites x #frequencies
+    idx_N = (NO_PARAM + 1):(NO_PARAM + s_f);     % indices of ambiguities
+    idx_iono = (NO_PARAM + s_f + 1):(NO_PARAM + s_f + no_sats);
 
-% save fixed N1, N2, N3 to Adjust for the fixed adjustment
-Adjust.N1_fixed = N__(:, 1);
-Adjust.N2_fixed = N__(:, 2);
-Adjust.N3_fixed = N__(:, 3);
+    % get float ambiguities
+    N_float = Adjust.param(idx_N);
 
+    % difference between float and fixed ambiguities
+    N_diff = N_float - N_fixed;
+
+    % check which ambiguities are good
+    keep = ~isnan(N_diff) & abs(N_diff) < 1;
+
+    % covariance matrix of float ambiguities
+    Q_NN = Adjust.param_sigma(idx_N, idx_N);
+
+    % part of covariance matrix corresponding to all non-ambiguity parameters
+    idx = [1:NO_PARAM, idx_iono];
+    Q_bn = Adjust.param_sigma(idx, idx_N);
+
+
+    % update float position with fixed ambiguities [23], equation (1):
+    Q_bn_ = Q_bn(:,keep); Q_NN_ = Q_NN(keep, keep); N_diff_ = N_diff(keep);
+    Adjust.param_fix(idx) = Adjust.param(idx) - Q_bn_ * (Q_NN_ \ N_diff_);
+
+    % save results
+    Adjust.fixed = true;
+    % fixed ionospheric delay
+    Adjust.iono_fix = Adjust.param_fix(idx_iono);
+    % ||| fixed code and phase residuals
+    codephase = NaN(6*no_sats,1);
+    Adjust.res_fix(:,1) = codephase((1            ) : (2*no_sats));
+    Adjust.res_fix(:,2) = codephase((1 + 2*no_sats) : (4*no_sats));
+    Adjust.res_fix(:,3) = codephase((1 + 4*no_sats) : (6*no_sats));
+    % ||| covariance matrix of fixed parameters
+    Adjust.param_sigma_fix = NaN(3);
+
+else
+    % not enough ambiguities fixed to calcute fixed solution
+    Adjust.param_fix(1:3) = NaN;
+    Adjust.fixed = false;
+end

@@ -285,6 +285,6 @@ try
     rec_OSB = - OSB_station.(biastype).value * ns2m; 	% minus, too add bias later
     rec_OSB = rec_OSB(1);
 catch
-    errordlg(['Check receiver OSB for ' biastype], 'OSB Error');
+    errordlg({['Check receiver OSB for ' biastype]; 'or activate estimation of receiver'; 'DCBs (Estimation > Adjustment)!'}, 'OSB Error');
 end
         

@@ -11,7 +11,7 @@
 classdef DEF
     
     properties (Constant = true)
-        version = ['Version 4.0 ', char(169), ' TUW 2025'];
+        version = ['Version 4.1 ', char(169), ' TUW 2023'];
         
         % size of many variables due to raPPPid internal satellite numbering
         SATS = 410;
@@ -37,7 +37,10 @@ classdef DEF
         
         % threshold for norm of coordinates to stop inner-epoch iteration 
         ITERATION_THRESHOLD = 1e-3;     % [m]  
-                
+               
+        % threshold for significant receiver clock change
+        REC_CLOCK_CHANGE_THRESHOLD = 1000;     % [m] ||| random, check
+
         % default observation type ranking
         RANKING_GPS = 'WCDPSLXYMDIQ';
         RANKING_GLO = 'PCIQX';

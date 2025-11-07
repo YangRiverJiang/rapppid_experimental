@@ -169,11 +169,13 @@ else        % Start Processing of single file
     % update plot-panel of GUI_PPP
     handles = disable_plot_checkboxes(handles, settings_);
     path_data4plot = [settings_.PROC.output_dir, '/data4plot.mat'];
-    set(handles.edit_plot_path,'String', path_data4plot);  	% ||| ugly
-    handles.paths.plotfile = path_data4plot;      % save path to data4plot.mat into handles
-    set(handles.pushbutton_load_pos_true,'Enable','On');
-    set(handles.pushbutton_load_true_kinematic,'Enable','On');
-    handles.paths.lastproc = settings_.PROC.output_dir;     	% save path to last processing into handles
+    if isfile(path_data4plot)
+        set(handles.edit_plot_path,'String', path_data4plot);  	% ||| ugly
+        handles.paths.plotfile = path_data4plot;      % save path to data4plot.mat into handles
+        set(handles.pushbutton_load_pos_true,'Enable','On');
+        set(handles.pushbutton_load_true_kinematic,'Enable','On');
+        handles.paths.lastproc = settings_.PROC.output_dir;     	% save path to last processing into handles
+    end
     set(handles.pushbutton_delete,  'Enable','On');
     set(handles.pushbutton_results, 'Enable','On');
     fprintf('\n---------------------------------------------------------------------\n');

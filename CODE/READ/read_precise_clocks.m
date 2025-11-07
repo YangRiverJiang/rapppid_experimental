@@ -11,8 +11,9 @@ function [GPS, GLO, GAL, BDS, QZSS] = read_precise_clocks(file_clk, bool_check)
 % 	... .dT:        (#epochs x #sats) clock corrections [s]
 % 	... .sigma_dT:  (#epochs x #sats) sigma of clock corrections [s]
 %  
-%   Revision:
+% Revision:
 %   2023/11/03, MFWG: adding QZSS
+%   2025/08/14, MFWG: switch to cal2gpstime
 % 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -84,8 +85,7 @@ while ischar(tline)                 % loop over rows/lines of file
     % record of GNSS satellite:
     if contains('GRECJ', gnss_char)
         % find out time (always GPS time)
-        jd = cal2jd_GT(year, month, day + hour/24 + min/1440 + sec/86400);
-        [~,sow,~] = jd2gps_GT(jd);
+        [~, sow] = cal2gpstime([year month day hour min sec]);
         % look if new epoch
         if isfirst
             epoch = epoch + 1;

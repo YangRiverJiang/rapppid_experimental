@@ -1048,6 +1048,13 @@ if sum(pos_true) ~= 0
     set(handles.edit_x_true, 'String', num2str(pos_true(1)));
     set(handles.edit_y_true, 'String', num2str(pos_true(2)));
     set(handles.edit_z_true, 'String', num2str(pos_true(3)));
+    % change text around textfields
+    set(handles.text_x_true, 'String', 'X-Coordinate:');
+    set(handles.text_y_true, 'String', 'Y-Coordinate:');
+    set(handles.text_z_true, 'String', 'Z-Coordinate:');
+    set(handles.text139, 'Visible', 'On');
+    set(handles.text141, 'Visible', 'On');
+    set(handles.text143, 'Visible', 'On');
 end
 
 end
@@ -1059,9 +1066,16 @@ if isempty(handles.edit_plot_path.String);    return;   end
 if FileName == 0;    return;    end
 PathName = relativepath(PathName);   % convert absolute path to relative path
 % write into textfields
-set(handles.edit_x_true, 'String', 'Reference Trajectory:');
+set(handles.edit_x_true, 'String', 'Reference Trajectory');
 set(handles.edit_y_true, 'String', PathName);
 set(handles.edit_z_true, 'String', FileName);
+% change text around textfields
+set(handles.text_x_true, 'String', 'Source:');
+set(handles.text_y_true, 'String', 'Folder:');
+set(handles.text_z_true, 'String', 'File:');
+set(handles.text139, 'Visible', 'Off');
+set(handles.text141, 'Visible', 'Off');
+set(handles.text143, 'Visible', 'Off');
 end
 
 
@@ -1560,6 +1574,17 @@ function pushbutton_plot_stations_Callback(hObject, eventdata, handles)
 % world map
 TABLE = GetTableData(handles.uitable_batch_proc.Data, 2, [], 2, [1 2]);
 if ~isempty(TABLE)
+    % print station, receicer, and antenna to command window
+    n = size(TABLE,1);              % number of stations in table
+    fprintf('| STAT | RECEIVER             | ANTENNA              | \n');    % print header
+    fprintf('------------------------------------------------------\n');
+    for i = 1:n
+        fpath = [TABLE{i,1} TABLE{i,2}];    % filepath to RINEX file
+        rheader = anheader_GUI(fpath);      % read out header
+        fprintf('| %s | %s | %s |\n', rheader.station_long(1:4), rheader.receiver, rheader.antenna);
+    end
+    fprintf('------------------------------------------------------\n'); fprintf('\n\n');
+    % plot stations over world
     StationWorldPlot(TABLE);
 end
 end
@@ -1737,9 +1762,10 @@ while true      % loop to add multiple files
     PathName = relativepath(PathName);      	% convert absolute path to relative path
     
     % search all data4plot.mat and add it to table
-    AllFiles1 = dir([PathName '/**/data4plot.mat']);        % get all data4plot.mat-files in folder and subfolders
-    AllFiles2 = dir([PathName '/**/results_float.txt']);  	% get all result_float.txt-files
-    AllFiles = struct2table([AllFiles1; AllFiles2]);        % merge together and convert to table
+    Files1 = dir([PathName '/**/data4plot.mat']);       % get all data4plot.mat-files in folder and subfolders
+    Files2 = dir([PathName '/**/results_float.txt']);   % get all result_float.txt-files
+    Files3 = dir([PathName '/**/results_float.csv']);   % get all result_float.csv-files
+    AllFiles = struct2table([Files1; Files2;Files3]);   % merge together and convert to table
     [all_folders, ~, ~] = unique(AllFiles(:,2),'stable');   % keep unique folders    
     
     n = numel(all_folders);
@@ -1762,7 +1788,9 @@ while true      % loop to add multiple files
         if~iscell(path_folder); path_folder = {path_folder}; end
         path_folder = path_folder{1};        
         path_data4plot = [path_folder '/data4plot.mat'];
+        path_settings = [path_folder '/settings.mat'];
         path_results_txt = [path_folder '/results_float.txt'];
+        path_results_csv = [path_folder '/results_float.csv'];
         path_settings_txt = [path_folder '/settings_summary.txt'];
         if isfile(path_data4plot)
             try
@@ -1774,11 +1802,13 @@ while true      % loop to add multiple files
             end
         else            % data4plot.mat is not existing -> try settings.txt
             obs.coordsyst = ''; settings.PROC.name = '';
-            if isfile(path_results_txt) && isfile(path_settings_txt)
+            if isfile(path_settings_txt)
                 obs = recover_obs(path_settings_txt);
-                % ||| processing name and coordinate system are not detected
             else
                 obs.stationname = ''; obs.startdate = '';
+            end
+            if isfile(path_settings)
+                load(path_settings, 'settings')
             end
         end
         stations{i} = obs.stationname;
@@ -1848,7 +1878,7 @@ if handles.checkbox_multi_plot_each_row.Value || handles.checkbox_multi_plot_eac
         handles.checkbox_multi_plot_each_station.Value = 0;
     end
 end
-% Adds last finished processing to Multi-Plot table
+% Add last finished processing to Multi-Plot table
 folder_last_proc = handles.paths.lastproc;      % relative path
 if isempty(folder_last_proc)
     return      % no last processing
@@ -1863,11 +1893,15 @@ for i = 1:rows
         break
     end
 end
-path_data4plot = [folder_last_proc '/data4plot.mat'];
+path_data4plot   = [folder_last_proc '/data4plot.mat'];
 try
     load(path_data4plot, 'obs', 'settings')
 catch
-    return                  % loading of last processing failed
+    obs = recover_obs(folder_last_proc);
+    settings = recover_settings(folder_last_proc);
+    if isempty(obs.startdate) && isempty(obs.stationname)
+        return                  % loading of last processing failed
+    end
 end
 
 % get some information about the last processing
@@ -1972,7 +2006,7 @@ MultiPlotStruct = getMultiPlotSelection(handles);
 [boolean, MultiPlotStruct] = checkMultiPlotSelection(MultiPlotStruct, handles);
 if boolean
     if MultiPlotStruct.graph
-        StationResultPlot(TABLE_use, MultiPlotStruct)
+        StationResultPlot(TABLE_use, MultiPlotStruct)       % Station Graph
     end
     if MultiPlotStruct.coord_conv || MultiPlotStruct.histo_conv || MultiPlotStruct.bar || MultiPlotStruct.box || MultiPlotStruct.pos_conv || MultiPlotStruct.ttff || MultiPlotStruct.convaccur || MultiPlotStruct.quant_conv || MultiPlotStruct.tropo
         MultiPlot(PATHS, XYZ_true, LABELS, MultiPlotStruct);
@@ -2258,7 +2292,7 @@ end
 
 function pushbutton_sp3_Callback(hObject, eventdata, handles)
 folder = getFolderPath([Path.DATA '/ORBIT/'], handles.paths.sp3_1, handles.paths.rinex_date);
-[FileName, PathName] = uigetfile({'*.sp3*;*.eph*'}, 'Select the .sp3 File', GetFullPath(folder));
+[FileName, PathName] = uigetfile({'*.sp3*;*.eph*;*.pre*'}, 'Select the .sp3 File', GetFullPath(folder));
 
 PathName = relativepath(PathName);   % convert absolute path to relative path
 if ~FileName            % uigetfile cancelled
@@ -4287,21 +4321,21 @@ if ~handles.checkbox_singlemultiplot.Value
         % saved in handles -> load data from data4plot.mat
         load(path_data4plot, 'obs', 'satellites', 'storeData');
         handles.settings = settings;
-        if exist('obs', 'var')
-            handles.obs = obs;
-        else        % obs was not exported to data4plot.mat -> recover from settings_summary.txt
+        if ~exist('obs', 'var')         
+            % obs was not exported to data4plot.mat -> recover from settings_summary.txt
             obs = recover_obs(strrep(path_data4plot, 'data4plot.mat', ''));
         end
-        if exist('storeData', 'var')
-            handles.storeData = storeData;
-        else        % storeData was not exported to data4plot.mat -> recover from results_float/_fixed.txt
+        if ~exist('storeData', 'var')   
+            % storeData was not exported to data4plot.mat -> recover from results_float/_fixed.txt
             storeData = recover_storeData(strrep(path_data4plot, 'data4plot.mat', ''));
         end
-        if exist('satellites', 'var')
-            handles.satellites = satellites;
-        else        % satellies was not exported to data4plot.mat
-            satellites = [];        % ||| nothing to recover
+        % ||| nothing to recover satellites
+        if ~exist('satellites', 'var')
+            satellites = [];        
         end
+        handles.obs = obs;
+        handles.satellites = satellites;
+        handles.storeData = storeData;
     end
     
 else
@@ -4346,12 +4380,12 @@ catch
     settings.INPUT.use_QZSS = 0;
 end
 
-% uncheck all plots
-un_check_plot_checkboxes(handles, 0);           
-
 % create plots
 SinglePlotting(satellites, storeData, obs, settings)
 handles.paths.last_plot = settings.PLOT;        % save selected plots
+
+% uncheck all plots
+un_check_plot_checkboxes(handles, 0);   
 
 guidata(hObject, handles);
 end

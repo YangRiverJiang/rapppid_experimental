@@ -14,7 +14,8 @@ function Adjust = fixedAdjustment_IF(Epoch, Adjust, model, b_WL, b_NL, settings)
 %
 %   Revision:
 %   2025/06/11, MFWG: remove unnecessary code (wrong fix detection)
-%
+%   2025/10/17, MFWG: QZSS fixing
+% 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
@@ -28,6 +29,7 @@ NO_PARAM_FIX = Adjust.NO_PARAM;
     model_IF_fixed_observations(model, Epoch, Adjust.param, settings);
 
 % calculate observed minus computed; for code and phase as vector alternately
+omc = zeros(2*length(Epoch.sats), 1);
 omc(1:2:2*length(Epoch.sats),1) =  (Epoch.code -  model_code_fix).*(~Epoch.exclude);
 omc(2:2:2*length(Epoch.sats),1) = (Epoch.phase - model_phase_fix).*(~Epoch.exclude).*(~Epoch.cs_found);
 
@@ -40,21 +42,25 @@ prn_fixed(prn_fixed == Epoch.refSatBDS) = [];
 % booleans of fixed satellites for each GNSS 
 bool_gps_fix = prn_fixed < 100;
 bool_gal_fix = prn_fixed > 200 & prn_fixed < 300;
-bool_bds_fix = prn_fixed > 300;
+bool_bds_fix = prn_fixed > 300 & prn_fixed < 400;
+bool_qzs_fix = prn_fixed > 400 & prn_fixed < 499;
 % get fixed satellites for each GNSS
 prn_fixed_GPS = prn_fixed(bool_gps_fix);
 prn_fixed_GAL = prn_fixed(bool_gal_fix);
 prn_fixed_BDS = prn_fixed(bool_bds_fix);
+prn_fixed_QZS = prn_fixed(bool_qzs_fix);
 % number of fixed satellites for each GNSS
 n_fix_GPS = numel(prn_fixed_GPS);
 n_fix_GAL = numel(prn_fixed_GAL);
 n_fix_BDS = numel(prn_fixed_BDS);
+n_fix_QZS = numel(prn_fixed_QZS);
 
 % get indices of fixed satellites of each GNSS in Epoch.sats
 [~, idx_fixed] = intersect(Epoch.sats, prn_fixed);      % indices of fixed satellites in Epoch.sats
 [~, idx_fixed_gps] = intersect(Epoch.sats, prn_fixed(bool_gps_fix));
 [~, idx_fixed_gal] = intersect(Epoch.sats, prn_fixed(bool_gal_fix));
 [~, idx_fixed_bds] = intersect(Epoch.sats, prn_fixed(bool_bds_fix));
+[~, idx_fixed_qzs] = intersect(Epoch.sats, prn_fixed(bool_qzs_fix));
 % wavelength 1st frequency of fixed satellites
 lam1 = Epoch.l1(idx_fixed);
 % frequency 1st and 2nd frequency of fixed satellites
@@ -74,24 +80,23 @@ omc_fixed = [omc; N_IF_fixed];
 A_float = Adjust.A;       			% Design Matrix from float adjustment
 n = size(A_float,2);                % number of columns of A-Matrix
 
-% Generate additional A-matrix for GPS
-A_GPS = [];
-if Epoch.refSatGPS_idx ~= 0
+% Generate additional A-matrices
+A_GPS = []; A_GAL = []; A_BDS = []; A_QZS = [];
+if Epoch.refSatGPS_idx ~= 0         % GPS
     A_GPS = createFixedA(idx_fixed_gps, n_fix_GPS, n, NO_PARAM_FIX, Epoch.refSatGPS_idx);
 end
-% Generate additional A-matrix for Galileo
-A_GAL = [];
-if Epoch.refSatGAL_idx ~= 0
+if Epoch.refSatGAL_idx ~= 0         % Galileo
     A_GAL = createFixedA(idx_fixed_gal, n_fix_GAL, n, NO_PARAM_FIX, Epoch.refSatGAL_idx);
 end
-% Generate additional A-matrix for BeiDou
-A_BDS = [];
-if Epoch.refSatBDS_idx ~= 0
+if Epoch.refSatBDS_idx ~= 0         % BeiDou
     A_BDS = createFixedA(idx_fixed_bds, n_fix_BDS, n, NO_PARAM_FIX, Epoch.refSatBDS_idx);
+end
+if Epoch.refSatQZS_idx ~= 0         % QZSS
+    A_QZS = createFixedA(idx_fixed_qzs, n_fix_QZS, n, NO_PARAM_FIX, Epoch.refSatQZS_idx);
 end
 
 % Build A-Matrix with pseudo-observations
-A_fixed = [A_float; A_GPS; A_GAL; A_BDS];
+A_fixed = [A_float; A_GPS; A_GAL; A_BDS; A_QZS];
 
 
 %% P-Matrix
@@ -99,6 +104,7 @@ P_fixed = createFixedP(...
     idx_fixed_gps, n_fix_GPS, Epoch.refSatGPS_idx, ...
     idx_fixed_gal, n_fix_GAL, Epoch.refSatGAL_idx, ...
     idx_fixed_bds, n_fix_BDS, Epoch.refSatBDS_idx, ...
+    idx_fixed_qzs, n_fix_QZS, Epoch.refSatQZS_idx, ...
     model.el*pi/180, Adjust.P);
 
 
@@ -140,15 +146,16 @@ A_fixed(elements) = -1;             % because of satellite single differences
 end
 
 function P_fixed = createFixedP(idx_fixed_gps, no_fixed_GPS, refSatGPS_idx, ...
-    idx_fixed_gal, no_fixed_GAL, refSatGAL_idx, idx_fixed_bds, no_fixed_BDS, refSatBDS_idx, elev, P_float)
+    idx_fixed_gal, no_fixed_GAL, refSatGAL_idx, idx_fixed_bds, no_fixed_BDS, refSatBDS_idx, ...
+    idx_fixed_qzs, no_fixed_QZS, refSatQZS_idx, elev, P_float)
 % This function creates the part of the fixed weight matrix for the fixed
 % ambiguity pseudo-observations for GPS + Galileo + BeiDou
 % INPUT:
-%   idx_fixed_gps/_gal/_bds 	
+%   idx_fixed_gps/_gal/...	
 %               indices of fixed satellites referred to satellites of current epoch
-%   no_fixed_GPS/_GAL/_BDS   	
+%   no_fixed_GPS/_GAL/...	
 %               number of fixed satellites for this GNSS
-%   refSat_idx_GPS/_GAL/_BDS   
+%   refSat_idx_GPS/_GAL/...   
 %               index of reference satellite referred to satellites of current epoch
 %   elev    	elevation [rad] for all satellites of current epoch
 %   P_float     weight matrix of float solution
@@ -157,20 +164,22 @@ function P_fixed = createFixedP(idx_fixed_gps, no_fixed_GPS, refSatGPS_idx, ...
 % *************************************************************************
 % ||| Richtige Kovarianzfortpflanzung machen???
 
-P_GPS = [];     % Generate P-Matrix for GPS
-if refSatGPS_idx ~= 0
+% Generate P matrices
+P_GPS = []; P_GAL = []; P_BDS = []; P_QZS = [];
+if refSatGPS_idx ~= 0       % GPS
     P_GPS = createFixedP_GNSS(idx_fixed_gps, no_fixed_GPS, elev, refSatGPS_idx);
 end
-P_GAL = [];     % Generate P-Matrix for Galileo
-if refSatGAL_idx ~= 0
+if refSatGAL_idx ~= 0       % Galileo
     P_GAL = createFixedP_GNSS(idx_fixed_gal, no_fixed_GAL, elev, refSatGAL_idx);
 end
-P_BDS = [];     % Generate P-Matrix for BeiDou
-if refSatBDS_idx ~= 0
+if refSatBDS_idx ~= 0       % BeiDou
     P_BDS = createFixedP_GNSS(idx_fixed_bds, no_fixed_BDS, elev, refSatBDS_idx);
 end
+if refSatQZS_idx ~= 0       % QZSS
+    P_QZS = createFixedP_GNSS(idx_fixed_qzs, no_fixed_QZS, elev, refSatQZS_idx);
+end
 % Build P-Matrix
-P_fixed = blkdiag(P_float, P_GPS, P_GAL, P_BDS);
+P_fixed = blkdiag(P_float, P_GPS, P_GAL, P_BDS, P_QZS);
 
 end
 

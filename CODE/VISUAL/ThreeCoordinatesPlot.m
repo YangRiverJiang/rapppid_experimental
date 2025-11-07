@@ -30,9 +30,10 @@ RMS_dE = calculate_rms(dE);
 RMS_dH = calculate_rms(dH);
 
 % remove suspicious data
-ind = find(seconds==0 | isnan(seconds));        
-seconds(ind) = [];
-dN(ind) = []; dE(ind) = []; dH(ind) = [];
+bool_0 = seconds(2:end) == 0;       % always true for seconds(1)
+bool = isnan(seconds) | [false; bool_0];        % remove suspicious data, but keep first epoch   
+seconds(bool) = [];
+dN(bool) = []; dE(bool) = []; dH(bool) = [];
 
 % plot
 fig_3coord = figure('Name','Three Coordinates Plot', 'NumberTitle','off');

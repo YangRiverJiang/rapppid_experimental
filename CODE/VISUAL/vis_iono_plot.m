@@ -75,7 +75,7 @@ if bool_corr
     if isGLO
         iono_corr_R = iono_corr(:,idx_glo);
         subplot(no_rows, noGNSS, i_plot);       i_plot=i_plot+1;
-        plotIonoModelled(iono_corr_R, hours, resets, glo_obs, 'Glonass', xaxis_label)
+        plotIonoModelled(iono_corr_R, hours, resets, glo_obs, 'GLONASS', xaxis_label)
     end
     if isGAL
         iono_corr_E = iono_corr(:,idx_gal);
@@ -112,7 +112,7 @@ if bool_est
     if isGLO
         iono_est_R = iono_est(:,idx_glo);
         subplot(no_rows, noGNSS, i_plot);       i_plot=i_plot+1;
-        plotIonoEstimated(iono_est_R, hours, resets, glo_obs, 'Glonass', xaxis_label, sol_str)
+        plotIonoEstimated(iono_est_R, hours, resets, glo_obs, 'GLONASS', xaxis_label, sol_str)
     end
     if isGAL
         iono_est_E = iono_est(:,idx_gal);
@@ -154,7 +154,7 @@ if bool_corr && bool_est
         iono_corr_R = iono_corr(:,idx_glo);
         iono_diff = iono_est_R - iono_corr_R;
         subplot(no_rows, noGNSS, i_plot);       i_plot=i_plot+1;
-        plotIonoDiff(iono_diff, hours, resets, glo_obs, 'Glonass', xaxis_label)
+        plotIonoDiff(iono_diff, hours, resets, glo_obs, 'GLONASS', xaxis_label)
     end
     if isGAL
         iono_est_E = iono_est(:,idx_gal);

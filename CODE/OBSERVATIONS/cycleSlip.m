@@ -18,10 +18,6 @@ function [Epoch] = cycleSlip(Epoch, settings, use_column)
 
 if contains(settings.PROC.method, 'Phase')  % except code only solution
     
-    
-    % --- ||| check cs detection based on HMW LC
-    % https://link.springer.com/article/10.1007/s11018-019-01639-5?shared-article-renderer
-    
     % --- single-frequency cycle-slip detection 
     if settings.OTHER.CS.l1c1
         Epoch = cycleSlip_CLdiff(settings, Epoch, use_column);
@@ -45,18 +41,35 @@ if contains(settings.PROC.method, 'Phase')  % except code only solution
         Epoch = cycleSlip_TimeDiff(Epoch, use_column, settings);
     end    
     
-    
+    % --- cycle-slip detection based on averaged HMW LC
+    if settings.OTHER.CS.HMW
+        Epoch = cycleSlip_HMW(settings, Epoch, use_column);
+    end
+
     % --- check if Loss of Lock Indicator is set in RINEX observation file
     if settings.PROC.LLI
         Epoch = cycleSlip_LLI(Epoch, use_column, settings);
     end
-   
+
+    
     if strcmp(settings.IONO.model, 'Estimate, decoupled clock')
-        % DCM is sensitive if single phase observations are missing ->
-        % exclude all phase observations (although cycle slip might have
-        % been detected only on a single frequency)
-        Epoch.cs_found(any(Epoch.cs_found,2), :) = 1;
+        % ||| check if useful for other PPP models
+        % only use observations of satellites with all expected
+        % observations because DCM is sensitive to missing observations
+        n = settings.INPUT.n_gnss_freqs;
+        if n(1) == 3;   n(1) = 2;   end     % do not check GPS L5
+        bool_all = check_all_obs(Epoch, n, settings.INPUT.use_GPS, settings.INPUT.use_GLO, settings.INPUT.use_GAL, settings.INPUT.use_BDS, settings.INPUT.use_QZSS);
+        Epoch.exclude(~bool_all) = true;
     end
+    
+    if strcmp(settings.IONO.model, 'Estimate, decoupled clock')
+        % DCM is sensitive if (single) phase observations are missing ->
+        % exclude satellite completely (although a cycle slip might have
+        % been detected on a single frequency only)
+        Epoch.cs_found(any(Epoch.cs_found,2), :) = 1;
+        Epoch.exclude = Epoch.exclude | Epoch.cs_found;
+    end
+
 
     % save detected cycle slips in Epoch.sat_status
     Epoch.sat_status(Epoch.cs_found) = 3;

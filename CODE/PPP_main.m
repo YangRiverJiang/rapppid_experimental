@@ -58,8 +58,8 @@ end
 % Initialization and definition of global variable
 global STOP_CALC;	% for stopping calculations before last epoch, set to zero in GUI_PPP
 
-% number of processed frequencies
-[settings.INPUT.num_freqs, settings.INPUT.proc_freqs] = CountProcessedFrequencies(settings);
+% number of processed frequencies (for each GNSS) and of input frequencies
+[settings.INPUT.num_freqs, settings.INPUT.proc_freqs, settings.INPUT.n_gnss_freqs] = CountProcessedFrequencies(settings);
 
 % number of processed GNSS
 settings.INPUT.use_GNSS = settings.INPUT.use_GPS + settings.INPUT.use_GLO + settings.INPUT.use_GAL + settings.INPUT.use_BDS + settings.INPUT.use_QZSS;
@@ -113,12 +113,6 @@ elseif settings.PROC.timeSpan_format_SOD
 elseif settings.PROC.timeSpan_format_HOD
     settings.PROC.epochs = sod2epochs(OBSDATA, obs.newdataepoch, settings.PROC.timeFrame*3600, obs.rinex_version);   % *3600 in order to convert from seconds to hours
 end
-% convert start of fixing from minutes (GUI) to epochs for calculations
-if settings.AMBFIX.bool_AMBFIX
-    settings.AMBFIX.start_WL = settings.AMBFIX.start_WL_sec/obs.interval;
-    settings.AMBFIX.start_NL = settings.AMBFIX.start_NL_sec/obs.interval;
-    settings.AMBFIX.start_fixing = [settings.AMBFIX.start_WL, settings.AMBFIX.start_NL];
-end
 
 
     
@@ -129,15 +123,6 @@ end
 
 % create init_ambiguities
 init_ambiguities = NaN(3, 410);     % columns = satellites, rows = frequencies
-
-% initialize matrices for Hatch-Melbourne-Wübbena (HMW) LC between
-% different frequencies, e.g., for GPS L1-L2-L5 processing
-HMW_12 = []; HMW_23 = []; HMW_13 = [];
-if settings.AMBFIX.bool_AMBFIX
-    HMW_12 = zeros(settings.PROC.epochs(2)-settings.PROC.epochs(1)+1, 410);  % e.g., Wide-Lane (WL)
-    HMW_23 = zeros(settings.PROC.epochs(2)-settings.PROC.epochs(1)+1, 410);  % e.g., Extra-Wide-Lane (EW)
-    HMW_13 = zeros(settings.PROC.epochs(2)-settings.PROC.epochs(1)+1, 410);  % e.g., Medium-Lane (ML)
-end
 
 % Creating q for loop of epoch calculations, q is used for indexing the epochs
 q_range = 1:settings.PROC.epochs(2)-settings.PROC.epochs(1)+1; % one epoch more than the settings in GUI
@@ -206,7 +191,8 @@ for q = q_range         % loop over epochs
         % post-processing: check if end of file is reached
         if n > length(obs.newdataepoch)
             settings.PROC.epochs(2) = settings.PROC.epochs(1) + q - 2;
-            q = q - 1;          %#ok<FXSET>
+            q_range(q:end) = [];    % remove remaining epochs for creating output
+            q = q - 1;              %#ok<FXSET>
             Epoch.q = q;
             errordlg({['Epoch: ' sprintf(' %.0f',q)], 'End of Observation File reached!'}, ...
                 [obs.stationname sprintf(' %04.0f', obs.startdate(1)) sprintf('/%03.0f',floor(obs.doy))]);
@@ -220,7 +206,7 @@ for q = q_range         % loop over epochs
             ReadRinexRealTime(settings, input, obs, start_sow, q, fid_obs, fid_navmess, fid_corr2brdc);        
     end   
     
-    % ----- read in epoch data -----
+    % ----- read in observation data of current epoch -----
     if ~settings.INPUT.rawDataAndroid  	% from RINEX observation file
         [Epoch] = RINEX2Epoch(OBSDATA, obs.newdataepoch, Epoch, n, obs.no_obs_types, obs.rinex_version, settings);
     else                                % from Android raw sensor data
@@ -237,8 +223,8 @@ for q = q_range         % loop over epochs
     end
     
     % ----- reset solution -----
-    [Adjust, Epoch, settings, HMW_12, HMW_23, HMW_13, storeData, init_ambiguities] = ...
-        resetSolution(Adjust, Epoch, settings, HMW_12, HMW_23, HMW_13, storeData, obs.interval, init_ambiguities);
+    [Adjust, Epoch, settings, storeData, init_ambiguities] = ...
+        resetSolution(Adjust, Epoch, settings, storeData, init_ambiguities);
     
     % ----- sort and remove satellites -----
     Epoch = RemoveSort(settings, Epoch, q);
@@ -269,8 +255,8 @@ for q = q_range         % loop over epochs
 
     % ----- check, if epoch is excluded from processing -----
     if ~isempty(settings.PROC.excl_eps) && any(q == settings.PROC.excl_eps)
-        [settings, Epoch, Adjust, storeData, HMW_12, HMW_23, HMW_13] = ...
-            ExcludeEpoch(settings, Epoch, Adjust, storeData, HMW_12, HMW_23, HMW_13, bool_print);
+        [settings, Epoch, Adjust, storeData] = ...
+            ExcludeEpoch(settings, Epoch, Adjust, storeData, bool_print);
         continue
     end
 
@@ -351,14 +337,15 @@ for q = q_range         % loop over epochs
     % --- Build LCs and processed observations -> Epoch.code/.phase ---
     [Epoch, storeData] = create_LC_observations(Epoch, settings, storeData, q);
     
-    
+    % reset struct Adjust for new epoch
+    Adjust = reset_Adjust(Adjust, Epoch, settings);
+
     % -+-+-+-+-+-START CALCULATION EPOCH-WISE SOLUTION-+-+-+-+-+- 
-    [Adjust, Epoch, model, obs, HMW_12, HMW_23, HMW_13] = ...
-        ZD_processing(HMW_12, HMW_23, HMW_13, Adjust, Epoch, settings, input, satellites, obs);
+    [Adjust, Epoch, model, obs] = ZD_processing(Adjust, Epoch, settings, input, obs);
       
     % Save results from epoch-wise processing
     [satellites, storeData, model_save] = ...
-        saveData(Epoch, q, satellites, storeData, settings, Adjust, model, model_save, HMW_12, HMW_23, HMW_13);
+        saveData(Epoch, q, satellites, storeData, settings, Adjust, model, model_save);
     if settings.EXP.obs_epochheader; obs.epochheader(q) = cellstr(Epoch.rinex_header); end
     Epoch.delta_windup = model.delta_windup;        % [cycles], for calculation of Wind-Up correction in next epoch
       
@@ -430,7 +417,7 @@ if settings.EXP.settings
 end
 
 % Create Output Files
-[storeData] = create_output(storeData, obs, settings); 
+[storeData] = create_output(storeData, obs, settings, q_range); 
 
 % write data4plot.mat
 if settings.EXP.data4plot

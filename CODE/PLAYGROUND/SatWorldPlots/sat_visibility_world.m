@@ -160,7 +160,7 @@ if gps_on       % plot number of visible gps satellites
 end
 if glo_on       % plot number of visible glonass satellites
     plot_vis_sats(no_glo_sats, LAT, LON, coastlat, coastlon)
-    style_plot('Glonass', Eph_GLO.t(idx_glo,:))
+    style_plot('GLONASS', Eph_GLO.t(idx_glo,:))
     png_name = ['glo_' sprintf('%04d',idx_glo) '.png'];
     print(gcf, png_name,'-dpng','-r300')
 end

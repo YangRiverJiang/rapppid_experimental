@@ -25,21 +25,10 @@ reset_sow = storeData.gpstime(storeData.float_reset_epochs);
 
 duration = storeData.gpstime(end) - storeData.gpstime(1);     % total time of processing [sec]
 duration = duration/3600;                               % ... [h]
-% determine labelling of x-axis
-if duration < 0.5   % less than 1/2 hour
-    vec = 0:300:86400;          % 5min-intervall
-elseif duration < 1
-    vec = 0:(3600/4):86400;     % 15min-intervall
-elseif duration < 2
-    vec = 0:(3600/2):86400;     % 30min-intervall
-elseif duration < 4
-    vec = 0:3600:86400;         % 1-h-intervall
-elseif duration < 9
-    vec = 0:(3600*2):86400;   	% 2-h-intervall
-else
-    vec = 0:(3600*4):86400;    	% 4-h-intervall
-end
-ticks = sow2hhmm(vec);
+
+% create ticks
+[vec, ticks] = duration2ticks(duration);
+vec = mod(storeData.gpstime(1),86400) + vec;
 
 % Plot the Detection of Cycle-Slips with Single-Frequency-Data
 plotit(mod(storeData.gpstime,86400), full(storeData.cs_pred_SF), full(storeData.cs_L1C1), CS_settings.l1c1_threshold, sys, vec, ticks, mod(reset_sow,86400), CS_settings.l1c1_window)
@@ -95,7 +84,6 @@ for i = loop
         hold on
         plot(x, y+thresh, 'g-')     % plot difference plus threshold
         plot(x, y-thresh, 'g-') 	% plot difference minus threshold
-        if ~isempty(resets); vline(resets, 'k:'); end	% plot vertical lines for resets
         hold off
         % Styling
         Grid_Xoff_Yon()

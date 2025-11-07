@@ -13,6 +13,10 @@ function [funhandle] = SNRWeightingFunction(funstring)
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
+if isempty(funstring)
+    funhandle = [];
+    return
+end
 
 % check if somehow already a function handle
 if isa(funstring,'function_handle')

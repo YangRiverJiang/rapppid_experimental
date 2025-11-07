@@ -31,8 +31,8 @@ Adjust.Transition = [];	% Transition matrix (Kalman Filter)
 Adjust.Noise = [];    	% Noise matrix (Kalman Filter)
 Adjust.P_pred = [];     % inverse of parameters' covariance matrix (weight matrix of parameters)
 % PPP-AR variables
+Adjust.fix_now  = [false false];
 if settings.AMBFIX.bool_AMBFIX
-    Adjust.fix_now  = [];
     Adjust.A_fix  	= [];	% Design Matrix of the fixed solution
     Adjust.omc_fix 	= []; 	% observed minus computed of the fixed solution
     Adjust.param_fix= [];   % fixed parameters
@@ -83,12 +83,12 @@ if settings.PROC.check_omc
         Adjust.code_omc(:) = NaN;
         Adjust.phase_omc(:) = NaN;
     else                % move stored values up
-        n = settings.PROC.omc_window;
+        n = settings.PROC.omc_window; last = n + 1;
         if ~isnan(n)
-            Adjust.code_omc(1:n,:) = Adjust.code_omc(2:end,:);
-            Adjust.phase_omc(1:n,:) = Adjust.phase_omc(2:end,:);
-            Adjust.code_omc(end,:) = NaN;
-            Adjust.phase_omc(end,:) = NaN;
+            Adjust.code_omc(1:n,:) = Adjust.code_omc(2:last,:);
+            Adjust.phase_omc(1:n,:) = Adjust.phase_omc(2:last,:);
+            Adjust.code_omc(last,:) = NaN;
+            Adjust.phase_omc(last,:) = NaN;
         end
     end
 end
@@ -96,26 +96,23 @@ end
 % check if ambiguity fixing is performed in current epoch
 fix_now = [false false];    % [WL, NL]
 if settings.AMBFIX.bool_AMBFIX
-    % current fixing start epochs
-    WL_start_eps = settings.AMBFIX.start_fixing(end,1);
-    NL_start_eps = settings.AMBFIX.start_fixing(end,2);
     % direction of filter
     fwd = strcmp(settings.ADJ.filter.direction, 'Forwards');
     bwd = strcmp(settings.ADJ.filter.direction, 'Backwards');
     fwd_bwd = strcmpi(settings.ADJ.filter.direction, 'Fwd-Bwd');
     bwd_fwd = strcmpi(settings.ADJ.filter.direction, 'Bwd-Fwd');
-    
-    
-    
+
+    % check if fixing should be performed depending on the filter direction
     if fwd || fwd_bwd
-        % check if fixing should be performed
-        fix_now(1) = (Epoch.q >= WL_start_eps);
-        fix_now(2) = (Epoch.q >= NL_start_eps);
+        % filter runs forwards first
+        fix_now(1) = (Epoch.gps_time - Adjust.reset_time >= settings.AMBFIX.start_WL_sec);
+        fix_now(2) = (Epoch.gps_time - Adjust.reset_time >= settings.AMBFIX.start_NL_sec);
     elseif bwd || bwd_fwd
+        % filter runs backwards (!) first
         fix_now(1) = (Adjust.reset_time - Epoch.gps_time >= settings.AMBFIX.start_WL_sec);
-        fix_now(2) = (Adjust.reset_time - Epoch.gps_time >= settings.AMBFIX.start_WL_sec);
+        fix_now(2) = (Adjust.reset_time - Epoch.gps_time >= settings.AMBFIX.start_NL_sec);
     end
-    
+
     if (fwd_bwd || bwd_fwd) && Adjust.fixed
         % valid fixed solution (e.g., from forwards run) -> continue fixing
         fix_now(1) = true; fix_now(2) = true;

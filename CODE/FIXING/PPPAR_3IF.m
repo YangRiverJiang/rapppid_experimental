@@ -1,9 +1,7 @@
-function [Epoch, Adjust] = ...
-    PPPAR_3IF(HMW_12, HMW_23, HMW_13, Adjust, Epoch, settings, input, obs, model)
+function [Epoch, Adjust] = PPPAR_3IF(Adjust, Epoch, settings, input, obs, model)
 % Calculating fixed position for the PPP model with a 3-frequency-IF-LC
 %
 % INPUT:
-%	HMW_12,...  Hatch-Melbourne-Wübbena LC observables
 % 	Adjust      adjustment data and matrices for current epoch [struct]
 %	Epoch       epoch-specific data for current epoch [struct]
 %	settings    settings from GUI [struct]
@@ -26,7 +24,9 @@ q0 = Adjust.fixed_reset_epochs(end);    % epoch number of last reset
 NO_PARAM = Adjust.NO_PARAM;
 no_sats = numel(Epoch.sats);
 
-
+% get Hatch-Melbourne-WÃ¼bbena linear combination
+HMW_12 = Adjust.HMW_12;
+HMW_23 = Adjust.HMW_23;
 
 
 % --- Extra-Wide Lane-Fixing Procedure ---

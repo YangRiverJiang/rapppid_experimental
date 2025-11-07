@@ -1,6 +1,5 @@
 function  [input, obs, settings, OBSDATA] = readAllInputFiles(settings)
-
-% Reads in all input files in an internal raPPPid format: observations, 
+% Reads in all input files to an internal raPPPid format: observations, 
 % navigation file, precise satellite orbits, precise clocks, IONEX,
 % DCB-files, SINEX Bias, met-file, antex-file, ...
 % 
@@ -19,8 +18,11 @@ function  [input, obs, settings, OBSDATA] = readAllInputFiles(settings)
 % *************************************************************************
 
 bool_print = ~settings.INPUT.bool_parfor;
-input = []; Biases = []; 
+input = struct; Biases = []; 
 
+input.ORBCLK.Eph_GPS = [];     input.ORBCLK.Eph_GLO = [];     
+input.ORBCLK.Eph_GAL = [];     input.ORBCLK.Eph_BDS = [];  
+input.ORBCLK.Eph_QZSS = [];  
 
 
 %% Files - Set input files
@@ -106,6 +108,10 @@ if settings.ORBCLK.bool_sp3
     if settings.INPUT.use_GAL && isempty(input.ORBCLK.preciseEph_GAL); errordlg('No precise orbits for Galileo in sp3-file!', 'Error'); end
     if settings.INPUT.use_BDS && isempty(input.ORBCLK.preciseEph_BDS); errordlg('No precise orbits for BeiDou in sp3-file!', 'Error'); end
     if settings.INPUT.use_QZSS&& isempty(input.ORBCLK.preciseEph_QZSS);errordlg('No precise orbits for QZSS in sp3-file!', 'Error'); end
+else
+    input.ORBCLK.preciseEph_GPS = [];   input.ORBCLK.preciseEph_GLO = [];
+    input.ORBCLK.preciseEph_GAL = [];   input.ORBCLK.preciseEph_BDS = [];
+    input.ORBCLK.preciseEph_QZSS = [];
 end
 
 % Read precise clock file
@@ -143,6 +149,10 @@ elseif settings.ORBCLK.bool_sp3         % no precise clock file but a precise or
     % save the clock information from sp3 as it would be from precise clock file
     input = preciseOrbit2Clock(input, settings);
     settings.ORBCLK.bool_clk = 1;       % overwrite setting for precise clock
+else
+    input.ORBCLK.preciseClk_GPS = [];   input.ORBCLK.preciseClk_GLO = [];
+    input.ORBCLK.preciseClk_GAL = [];   input.ORBCLK.preciseClk_BDS = [];
+    input.ORBCLK.preciseClk_QZSS = [];
 end
 % if CNES and integer recovery clock: exclude unfixed satellites
 if settings.AMBFIX.bool_AMBFIX && strcmp(settings.ORBCLK.prec_prod, 'CNES') && strcmp(settings.BIASES.phase, 'off')
@@ -178,6 +188,11 @@ end
 bool_nav_iono = strcmp(settings.IONO.source, 'Klobuchar model') || ...
     strcmp(settings.IONO.source, 'NeQuick model') || ...
     strcmp(settings.IONO.source, 'NTCM-G');
+% initialize fields of navigation messages in struct input
+input.ORBCLK.Eph_GPS = [];     input.ORBCLK.Eph_GLO = [];     
+input.ORBCLK.Eph_GAL = [];     input.ORBCLK.Eph_BDS = []; 
+input.ORBCLK.Eph_QZSS = [];     % ||| not implemented
+% start read-in
 if (settings.ORBCLK.bool_brdc || glo_channels || bool_nav_iono) && ~settings.INPUT.bool_realtime
     [input] = read_brdc(settings, input, obs.leap_sec, glo_channels);
     if settings.INPUT.use_GLO
@@ -482,6 +497,18 @@ if settings.OTHER.ocean_loading
     if isempty(input.OTHER.OcLoad)
         fprintf(2, '\nStation was not found in OceanLoading.blq!\n')
     end
+end
+
+
+
+%% Estimation - Adjustment
+
+% read ORBEX carrying the orientation of LEO satellite
+if settings.ADJ.satellite.bool && strcmp(settings.ADJ.satellite.orient_mode, 'ORBEX')
+    Q = readmatrix('1st_Jan_quat.DBL', 'FileType','text', 'CommentStyle','#');
+    % [file,location] = uigetfile({'*.*'}, 'Selection ORBEX with attitude of satellite.');
+    % Q = readmatrix([location file], 'FileType','text', 'CommentStyle','#');
+    input.Quat_rec = Q(:,3:6);   % each row is [q0 q1 q2 q3]
 end
 
 

@@ -1,10 +1,8 @@
-function [Epoch, Adjust] = ...
-    PPPAR_IF(HMW_12, HMW_23, HMW_13, Adjust, Epoch, settings, input, obs, model)
+function [Epoch, Adjust] = PPPAR_IF(Adjust, Epoch, settings, input, obs, model)
 % This function calculates a fixed position for the model of the 
 % 2-frequency ionosphere-free linear-combination.
 %
 % INPUT:
-%	HMW_12,...  Hatch-Melbourne-Wübbena LC observables
 % 	Adjust  	adjustment data and matrices for current epoch [struct]
 %	Epoch       epoch-specific data for current epoch [struct]
 %	settings 	settings from GUI [struct]
@@ -15,6 +13,9 @@ function [Epoch, Adjust] = ...
 %	Adjust      adjustment data and matrices for current epoch [struct]
 %	Epoch       epoch-specific data for current epoch [struct]
 %
+% Revision:
+%   2025/10/17, MFWG: QZSS fixing
+% 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
@@ -28,9 +29,9 @@ no_sats = numel(Epoch.sats);
 WLNL_corr = strcmp(settings.BIASES.phase, 'SGG FCBs') || strcmp(settings.BIASES.phase, 'TUW (not implemented)');
 b_WL = zeros(no_sats,1);
 b_NL = zeros(no_sats,1); 
-isGPS = settings.INPUT.use_GPS;         % GPS processing enabled
-isGAL = settings.INPUT.use_GAL;         % Galileo processing enabled
-isBDS = settings.INPUT.use_BDS;         % BeiDou processing enabled
+% get Hatch-Melbourne-Wübbena linear combination
+HMW_12 = Adjust.HMW_12;
+HMW_23 = Adjust.HMW_23;
 
 
 if settings.INPUT.num_freqs == 2
@@ -45,14 +46,17 @@ if settings.INPUT.num_freqs == 2
         idx = find(dt_NL == min(dt_NL), 1, 'first');
         b_NL = input.BIASES.NL_UPDs.UPDs(idx, Epoch.sats)';     % (plus is necessary)
         % build single difference for enabled GNSS with ambiguity fixing
-        if isGPS && ~isempty(Epoch.refSatGPS_idx)
+        if settings.INPUT.use_GPS && ~isempty(Epoch.refSatGPS_idx)
             b_NL = b_NL - b_NL(Epoch.refSatGPS_idx).*Epoch.gps;
         end
-        if isGAL && ~isempty(Epoch.refSatGAL_idx)
+        if settings.INPUT.use_GAL && ~isempty(Epoch.refSatGAL_idx)
             b_NL = b_NL - b_NL(Epoch.refSatGAL_idx).*Epoch.gal;
         end
-        if isBDS && ~isempty(Epoch.refSatBDS_idx)
+        if settings.INPUT.use_BDS && ~isempty(Epoch.refSatBDS_idx)
             b_NL = b_NL - b_NL(Epoch.refSatBDS_idx).*Epoch.bds;
+        end 
+        if settings.INPUT.use_QZSS&& ~isempty(Epoch.refSatBDS_idx)
+            b_NL = b_NL - b_NL(Epoch.refSatQZS_idx).*Epoch.qzss;
         end        
 
     elseif strcmp(settings.ORBCLK.prec_prod, 'CNES') && ~contains(settings.BIASES.code, 'CNES') && Adjust.fix_now(1)
@@ -67,7 +71,7 @@ if settings.INPUT.num_freqs == 2
             sats_gal = Epoch.sats(Epoch.gal);
             HMW_12(q_hmw, sats_gal) = HMW_12(q_hmw, sats_gal) + input.ORBCLK.preciseClk_GAL.WL(sats_gal-200);
         end
-        % currently (May 2020) there are no Glonass or BeiDou biases included
+        % currently (May 2020) no GLONASS or BeiDou biases are included
     end
     
     % --- Wide-Lane-Fixing-Fixing procedure ---
@@ -88,7 +92,7 @@ if settings.INPUT.num_freqs == 2
             
             % --- Start fixed adjustment with fixed SD-ambiguities as additional pseudo-observations ---
             % ||| check condition - beside reference satellites 3+ NL-Ambiguities are fixed
-            if 3 <= sum(~isnan(Epoch.NL_12)) - (Epoch.refSatGPS ~= 0) - (Epoch.refSatGAL ~= 0) - (Epoch.refSatBDS ~= 0)    
+            if 3 <= sum(~isnan(Epoch.NL_12)) - (Epoch.refSatGPS ~= 0) - (Epoch.refSatGAL ~= 0) - (Epoch.refSatBDS ~= 0) - (Epoch.refSatQZS ~= 0)   
                 if ~DEF.PPPAR_IF_LSQ
                     Adjust = Float2Fixed_IF(Epoch, Adjust, settings, b_NL);
                 else

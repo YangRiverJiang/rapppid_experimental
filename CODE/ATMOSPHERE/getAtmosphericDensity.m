@@ -1,4 +1,4 @@
-function rhoAtmo = getAtmosphericDensity(altitude)
+function rhoAtmo = getAtmosphericDensity(alt_m)
 % Extracts the Earth's atmospheric density for a given altitude
 % 
 % INPUT:
@@ -14,26 +14,17 @@ function rhoAtmo = getAtmosphericDensity(altitude)
 % This function belongs to raPPPid, Copyright (c) 2025, M.F. Wareyka-Glaner
 % *************************************************************************
 
+h = alt_m/1000;  % km
 
-% Constants
-H0 = 7000;          % Scale height for the thermosphere in meters
-rho_0 = 1.225e-3;   % Density at sea level in kg/m^3
+% Altitude [km]     Density [kg/m^3]  (order-of-magnitude, MSIS-like)
+alt_km = [200  300    400     500     600     700     800     900     1000];
+rho_tab = [1.9e-9 2.2e-11 3.5e-12 1.0e-12 3.0e-13 1.0e-13 5.0e-14 2.0e-14 1.0e-14];
 
-% Validate input altitude
-if altitude < 0
-    error('Altitude cannot be negative');
-elseif altitude < 200000  % Below LEO, consider atmosphere negligible
-    rhoAtmo = 0;
-    return;
-end
-
-% Scale height for thermosphere: Exponential drop-off model
-% Using a simple model where density decays exponentially with altitude
-% Valid for altitudes between 200 km and 1000 km
-rhoAtmo = rho_0 * exp(-(altitude - 200000) / H0);
-
-% Check for extreme altitudes above 1000 km, treat as negligible
-if altitude > 1000000
-    rhoAtmo = 0;
-end
+% Clamp & log-linear interpolate
+if h <= alt_km(1)
+    rhoAtmo = rho_tab(1);
+elseif h >= alt_km(end)
+    rhoAtmo = rho_tab(end);
+else
+    rhoAtmo = exp(interp1(alt_km, log(rho_tab), h, 'linear'));
 end

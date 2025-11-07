@@ -28,7 +28,7 @@ if ~boolean
 		PLOT.XYZ      	   = handles.paths.last_plot.XYZ;
         PLOT.elevation     = handles.paths.last_plot.elevation;
         PLOT.satvisibility = handles.paths.last_plot.satvisibility;
-        PLOT.float_amb     = handles.paths.last_plot.amb;
+        PLOT.amb           = handles.paths.last_plot.amb;
 %        PLOT.fixed_amb     = handles.paths.last_plot.fixed_amb;
         PLOT.clock         = handles.paths.last_plot.clock;
 		PLOT.dcb           = handles.paths.last_plot.dcb;

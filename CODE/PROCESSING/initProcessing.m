@@ -32,11 +32,11 @@ num_frqs = settings.INPUT.num_freqs;        % number of input frequencies
 % expected total number of processed epochs
 tot_eps = settings.PROC.epochs(2) - settings.PROC.epochs(1) + 1;    
 
-% booleans for processed GNSS
-isGPS = settings.INPUT.use_GPS;
-isGLO = settings.INPUT.use_GLO;
-isGAL = settings.INPUT.use_GAL;
-isBDS = settings.INPUT.use_BDS;
+% % booleans for processed GNSS
+% isGPS = settings.INPUT.use_GPS;
+% isGLO = settings.INPUT.use_GLO;
+% isGAL = settings.INPUT.use_GAL;
+% isBDS = settings.INPUT.use_BDS;
 
 
 %% Adjust
@@ -48,14 +48,40 @@ if decoupled_clock_model
     Adjust.NO_PARAM = DEF.NO_PARAM_DCM;
 	Adjust.ORDER_PARAM = DEF.PARAM_DCM;
 end   
-% Initialize Adjust for 1st epoch
+% Initialize Adjust
 Adjust.float = false;
 Adjust.fixed = false;
 Adjust.est_ZWD = false;             % true if ZWD is estimated in current epoch
 Adjust.float_reset_epochs = 1;      % 1st epoch of processing is like a reset of the solution
 Adjust.fixed_reset_epochs = 1;
 Adjust.reset_time = NaN;            % initialized in resetSolution.m in first epoch, time of last reset in gps-time [sow]
-Adjust.param = [];
+Adjust.param = [];          Adjust.param_pred = [];
+Adjust.param_sigma = [];    Adjust.param_sigma_pred = [];
+Adjust.constraint = false;  
+Adjust.iono_fix = [];
+Adjust.A = [];          % Design Matrix (aka Observation Matrix)
+Adjust.P = [];          % weight matrix of the observations
+Adjust.Q = [];          % covariance matrix of the observations
+Adjust.omc = [];        % observed minus computed
+Adjust.res = [];        % residuals for code and phase observations
+% fields for PPP-AR
+Adjust.fix_now = [false false];
+Adjust.A_fix  	= [];	% Design Matrix of the fixed solution
+Adjust.omc_fix 	= []; 	% observed minus computed of the fixed solution
+Adjust.param_fix= [];   % fixed parameters
+Adjust.res_fix 	= [];   % residuals of the fixed solution
+Adjust.param_sigma_fix = [];    % covariance matrix of the fixed parameters
+Adjust.P_fix 	= [];   % observations' weight matrix of the fixed solution
+Adjust.N1_fixed = [];   % fixed ambiguities on L1
+Adjust.N2_fixed = [];   % fixed ambiguities on L2
+Adjust.N3_fixed = [];   % fixed ambiguities on L3
+Adjust.iono_fix = [];   % fixed ionospheric delay estimation
+% filter variables
+Adjust.Transition = [];	% Transition matrix (Kalman Filter)
+Adjust.Noise = [];    	% Noise matrix (Kalman Filter)
+Adjust.P_pred = [];     % inverse of parameters' covariance matrix (weight matrix of parameters)
+Adjust.Noise_0 = []; 
+Adjust.Transition_0 = [];
 % to store the omc values for check_omc
 if settings.PROC.check_omc
     Adjust.code_omc  = [];
@@ -64,6 +90,14 @@ if settings.PROC.check_omc
         Adjust.code_omc  = NaN(settings.PROC.omc_window+1, nnn);
         Adjust.phase_omc = NaN(settings.PROC.omc_window+1, nnn);
     end
+end
+% initialize matrices for Hatch-Melbourne-Wübbena (HMW) LC between
+% different frequencies, e.g., for GPS L1-L2-L5 processing
+Adjust.HMW_12 = []; Adjust.HMW_23 = []; Adjust.HMW_13 = [];
+if settings.AMBFIX.bool_AMBFIX
+    Adjust.HMW_12 = zeros(settings.PROC.epochs(2)-settings.PROC.epochs(1)+1, 410);  % e.g., Wide-Lane (WL)
+    Adjust.HMW_23 = zeros(settings.PROC.epochs(2)-settings.PROC.epochs(1)+1, 410);  % e.g., Extra-Wide-Lane (EW)
+    Adjust.HMW_13 = zeros(settings.PROC.epochs(2)-settings.PROC.epochs(1)+1, 410);  % e.g., Medium-Lane (ML)
 end
 
 
@@ -81,6 +115,7 @@ end
 Epoch.gps_time = [];
 Epoch.gps_week = [];
 Epoch.mjd = [];
+Epoch.time = [];
 Epoch.q = 1;
 % observations
 Epoch.sats = [];
@@ -105,9 +140,14 @@ Epoch.other_systems = [];
 Epoch.tracked    = zeros(nnn,1);        % number of epochs each satellite is tracked, reset when cycle slip or under cutoff
 % cycle slip variables
 Epoch.cs_found = [];
-Epoch.cs_dL1dL2 = [];
+Epoch.cs_dL1dL2 = [];				% dLi - dLj
 Epoch.cs_dL1dL3 = [];
 Epoch.cs_dL2dL3 = [];
+Epoch.cs_HMW_k = zeros(3,nnn);		% HMW LC	
+Epoch.cs_HMW = [];
+Epoch.cs_HMW_av = zeros(3,nnn);
+Epoch.cs_HMW_var = zeros(3,nnn);
+
 if settings.OTHER.CS.l1c1
     % difference L1 minus C1 [m], 1st row = last epoch, 2nd row = 2nd last epoch, ...
     Epoch.cs_L1C1     = NaN(settings.OTHER.CS.l1c1_window,nnn);
@@ -115,6 +155,8 @@ if settings.OTHER.CS.l1c1
 end
 if settings.OTHER.CS.TimeDifference
    Epoch.cs_phase_obs = NaN(settings.OTHER.CS.TD_degree+1,nnn);
+   Epoch.cs_time_obs  = NaN(settings.OTHER.CS.TD_degree+1,nnn);
+   Epoch.cs_L1_diff = [];
 end
 if settings.OTHER.mp_detection
     Epoch.mp_C1_diff = NaN(settings.OTHER.mp_degree+1,nnn);		% C1 of last epochs
@@ -183,11 +225,13 @@ Epoch.corr2brdc_clk = zeros(5,nnn);		% timestamp, a0, a1, a2, IOD
 
 %% storeData
 storeData.gpstime = zeros(tot_eps,1);
+storeData.time = NaT(tot_eps, 1);
 storeData.dt_last_reset = zeros(tot_eps,1);
 storeData.NO_PARAM = Adjust.NO_PARAM;
 storeData.ORDER_PARAM = Adjust.ORDER_PARAM;
 storeData.obs_interval = obs.interval;
 storeData.float = false(tot_eps,1);         % set to true when float position is achieved
+storeData.fixed = false(tot_eps,1);         % true if fixed solution in this epoch
 % Adjusted Parameters and Covariance
 storeData.param     = zeros(tot_eps, Adjust.NO_PARAM);
 storeData.param_sigma = cell(tot_eps,1);    % cell as covariance matrix of parameters changes size over time
@@ -236,8 +280,7 @@ if settings.AMBFIX.bool_AMBFIX || decoupled_clock_model
 end
 
 % Ambiguity Fixing is enabled
-if settings.AMBFIX.bool_AMBFIX
-    storeData.fixed = false(tot_eps,1);         % true if fixed solution in this epoch
+if settings.AMBFIX.bool_AMBFIX    
     storeData.ttff = NaN;                       % time/epoch to first fix
     storeData.param_fix = zeros(tot_eps,Adjust.NO_PARAM);    	% fixed parameters
     storeData.param_var_fix = zeros(tot_eps,3);	% variances of fixed coordinates
@@ -304,6 +347,17 @@ end
 if settings.OTHER.CS.TimeDifference 
     storeData.cs_L1_diff	= zeros(tot_eps,nnn); % phase (L1) difference of last n epochs
 end
+% HMW LC
+if settings.OTHER.CS.DF
+    storeData.cs_WL_12_diff = zeros(tot_eps,nnn);
+    storeData.cs_var_12    = zeros(tot_eps,nnn);
+    if settings.INPUT.num_freqs > 2
+        storeData.cs_WL_13_diff = zeros(tot_eps,nnn);
+        storeData.cs_var_13    = zeros(tot_eps,nnn);
+        storeData.cs_WL_23_diff = zeros(tot_eps,nnn);
+        storeData.cs_var_23    = zeros(tot_eps,nnn);
+    end
+end
 
 % multipath detection
 if settings.OTHER.mp_detection
@@ -348,9 +402,12 @@ end
 
 
 %% satellites
-satellites.elev   = zeros(tot_eps,nnn);
-satellites.az     = zeros(tot_eps,nnn);
+satellites.elev   = zeros(tot_eps,nnn);		% elevation [°]
+satellites.az     = zeros(tot_eps,nnn);		% azimuth [°]
 satellites.obs    = zeros(tot_eps,nnn);   	% true if satellite observed
+if settings.ADJ.satellite.bool
+    satellites.bore = zeros(tot_eps,nnn);	% boresight angle [°]
+end
 
 % variables depending on the number of frequencies
 % Carrier-to-Noise density

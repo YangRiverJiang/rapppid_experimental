@@ -12,10 +12,21 @@ function [funhandle] = ElevationWeightingFunction(funstring)
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
 
+if isempty(funstring)
+    funhandle = [];
+    return
+end
+
 % check if somehow already a function handle
 if isa(funstring,'function_handle')
     funhandle = funstring;
     return
+end
+
+% check if hardcoded option of elevation weighting function is in use
+if contains(funstring, 'option')
+   funhandle = funstring;
+   return
 end
 
 % check string for valid beginning for conversion

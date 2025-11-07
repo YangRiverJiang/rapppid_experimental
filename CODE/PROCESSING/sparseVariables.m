@@ -13,31 +13,31 @@ num_freqs = settings.INPUT.num_freqs;       % number of input frequencies
 
 %% use sparse to save disk space
 % --- model_save
-if settings.EXP.model_save && proc_freqs == 1
-    model_save.phase            = sparse(model_save.phase);
-    model_save.code             = sparse(model_save.code);
-    model_save.rho              = sparse(model_save.rho);
-    model_save.dT_sat           = sparse(model_save.dT_sat);
-    model_save.dTrel            = sparse(model_save.dTrel);
-    model_save.dT_sat_rel       = sparse(model_save.dT_sat_rel);
-    model_save.Ttr              = sparse(model_save.Ttr);
-    model_save.k                = sparse(model_save.k);
-    model_save.trop             = sparse(model_save.trop);
-    model_save.ZTD              = sparse(model_save.ZTD);
-    model_save.iono             = sparse(model_save.iono);
-    model_save.mfw              = sparse(model_save.mfw);
-	model_save.mfh              = sparse(model_save.mfh);
-    model_save.delta_windup     = sparse(model_save.delta_windup);
-    model_save.windup           = sparse(model_save.windup);
-	model_save.shapiro          = sparse(model_save.shapiro);
-    model_save.solid_tides      = sparse(model_save.solid_tides);
-    model_save.ocean_loading    = sparse(model_save.ocean_loading);
-	model_save.polar_tides      = sparse(model_save.polar_tides);
-    model_save.PCO_rec     		= sparse(model_save.PCO_rec);
-    model_save.PCV_rec     		= sparse(model_save.PCV_rec);
-    model_save.ARP_ECEF       	= sparse(model_save.ARP_ECEF);
-    model_save.PCO_sat   		= sparse(model_save.PCO_sat);
-    model_save.PCV_sat   		= sparse(model_save.PCV_sat);
+if settings.EXP.model_save
+    model_save.phase            = trysparce(model_save.phase);
+    model_save.code             = trysparce(model_save.code);
+    model_save.rho              = trysparce(model_save.rho);
+    model_save.dT_sat           = trysparce(model_save.dT_sat);
+    model_save.dTrel            = trysparce(model_save.dTrel);
+    model_save.dT_sat_rel       = trysparce(model_save.dT_sat_rel);
+    model_save.Ttr              = trysparce(model_save.Ttr);
+    model_save.k                = trysparce(model_save.k);
+    model_save.trop             = trysparce(model_save.trop);
+    model_save.ZTD              = trysparce(model_save.ZTD);
+    model_save.iono             = trysparce(model_save.iono);
+    model_save.mfw              = trysparce(model_save.mfw);
+	model_save.mfh              = trysparce(model_save.mfh);
+    model_save.delta_windup     = trysparce(model_save.delta_windup);
+    model_save.windup           = trysparce(model_save.windup);
+	model_save.shapiro          = trysparce(model_save.shapiro);
+    model_save.solid_tides      = trysparce(model_save.solid_tides);
+    model_save.ocean_loading    = trysparce(model_save.ocean_loading);
+	model_save.polar_tides      = trysparce(model_save.polar_tides);
+    model_save.PCO_rec     		= trysparce(model_save.PCO_rec);
+    model_save.PCV_rec     		= trysparce(model_save.PCV_rec);
+    model_save.ARP_ECEF       	= trysparce(model_save.ARP_ECEF);
+    model_save.PCO_sat   		= trysparce(model_save.PCO_sat);
+    model_save.PCV_sat   		= trysparce(model_save.PCV_sat);
 end
 
 
@@ -64,25 +64,37 @@ end
 
 
 % cycle slip detection
-if settings.OTHER.CS.l1c1
+if settings.OTHER.CS.l1c1                               % code minus phase
     storeData.cs_pred_SF  = sparse(storeData.cs_pred_SF);
     storeData.cs_L1C1     = sparse(storeData.cs_L1C1);
 end
-if settings.OTHER.CS.DF
+if settings.OTHER.CS.DF                                 % dLi - dLj
     storeData.cs_dL1dL2 = sparse(storeData.cs_dL1dL2);
     if settings.INPUT.num_freqs > 2
         storeData.cs_dL1dL3 = sparse(storeData.cs_dL1dL3);
         storeData.cs_dL2dL3 = sparse(storeData.cs_dL2dL3);
     end
 end
-if settings.OTHER.CS.Doppler
+if settings.OTHER.CS.Doppler                            % Doppler
    storeData.cs_L1D1_diff = sparse(storeData.cs_L1D1_diff);
    storeData.cs_L2D2_diff = sparse(storeData.cs_L2D2_diff);
    storeData.cs_L3D3_diff = sparse(storeData.cs_L3D3_diff);
 end
-if settings.OTHER.CS.TimeDifference
+if settings.OTHER.CS.TimeDifference                     % time difference
     storeData.cs_L1_diff = sparse(storeData.cs_L1_diff);
 end
+if settings.OTHER.CS.HMW                                % HMW LC
+    storeData.cs_WL_12_diff = sparse(storeData.cs_WL_12_diff);
+    storeData.cs_var_12    = sparse(storeData.cs_var_12);
+    if settings.INPUT.num_freqs > 2
+        storeData.cs_WL_13_diff = sparse(storeData.cs_WL_13_diff);
+        storeData.cs_var_13    = sparse(storeData.cs_var_13);
+        storeData.cs_WL_23_diff = sparse(storeData.cs_WL_23_diff);
+        storeData.cs_var_23    = sparse(storeData.cs_var_23);
+    end
+end
+
+
 
 % multipath detection
 if settings.OTHER.mp_detection
@@ -149,10 +161,13 @@ end
 
 
 % --- satellites
+satellites.obs      = sparse(satellites.obs);
 satellites.elev     = sparse(satellites.elev);
 satellites.az       = sparse(satellites.az);
-satellites.obs      = sparse(satellites.obs);
-
+if settings.ADJ.satellite.bool
+	satellites.bore      = sparse(satellites.bore);
+end
+	
 % --- variables depending on number of input frequencies
 % Carrier-to-Noise density
 satellites.SNR_1 = sparse(satellites.SNR_1);
@@ -215,6 +230,15 @@ function N = replace_sparse(N, replace, fill)
 N(N == replace) = fill;
 N(isnan(N)) = 0;
 N = sparse(N);
+
+
+% function to replace value in variable and sparse afterwards, e.g. fixed
+% ambiguites replace 0 with 0.1 to make sparse possible
+function M = trysparce(M)
+if size(M, 3) == 1
+    M = sparse(M);
+end
+
 
 
 

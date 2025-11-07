@@ -25,7 +25,7 @@ function [] = MultiPlot(PATHS, XYZ_true, LABELS, PlotStruct)
 WBAR = waitbar(0, 'Creating Multi-Plot...', 'Name','Progress of creating Multi-Plot');
 
 % create some variables
-global STOP_CALC;   STOP_CALC = 0;
+global STOP_CALC;   STOP_CALC = 0;          %#ok<GVMIS>
 unique_labels = unique(LABELS, 'stable');  	% existing labels, keep order
 n_unique = numel(unique_labels);          	% number of different labels
 coleur = createDistinguishableColors(n_unique);
@@ -63,23 +63,11 @@ for i = 1:n_unique
     
     % loop over files of current label
     for ii = 1:n_label
-        storeData = []; obs = [];  	% reset variables from last iteration
-        
+        storeData = []; obs = [];  	 %#ok<NASGU> % reset variables from last iteration
+
         % load variables of current processing
-        try
-            fpath_data4plot = GetFullPath([paths{ii} 'data4plot.mat']);
-            load(fpath_data4plot, 'storeData', 'obs');      %  variables not used: 'satellites', 'settings', 'model_save'
-            if isempty(storeData); storeData = recover_storeData(paths{ii}); end
-            if isempty(obs); obs = recover_obs(paths{ii}); end
-        catch
-            try
-                storeData = recover_storeData(paths{ii});   % e.g., no data4plot.mat file
-                obs = recover_obs(paths{ii});
-            catch
-                errordlg({['Loading File #' sprintf('%d',ii) ' of label ' ], [curr_label ' failed!']}, 'Error')
-                continue
-            end
-        end
+        [storeData, obs, success] = LoadResults(paths{ii}, ii, curr_label);
+        if ~success; continue; end
 
         % get position data
         [pos_3D, pos_UTM] = getPositionData(storeData, obs, curr_label, PlotStruct);
@@ -120,7 +108,7 @@ for i = 1:n_unique
     
     % looking for points in time where convergence is reached (for all
     % convergence periods)
-    [conv_dN, conv_dE, conv_dH, conv_2D, conv_3D] = find_convergence(d.N, d.E, d.H, d.dT, PlotStruct);
+    [conv_dN, conv_dE, conv_dH, conv_2D, ~] = find_convergence(d.N, d.E, d.H, d.dT, PlotStruct);
     if PlotStruct.fixed;   TTCF{i} = conv_2D;   end         % save time to correct fix 
         
     % find quantiles and points in time which all convergence periods have

@@ -3,10 +3,10 @@ function obs = recover_obs(path)
 % the text file settings_summary.txt
 %
 % INPUT:
-%	folderstring        string, path to results folder of processing or
-%                       directly to the settings_summary.txt-file
+%	path            string, path to results folder of processing or
+%                   directly to the settings_summary.txt-file
 % OUTPUT:
-%	storeData           struct, contains recovered fields
+%	obs             struct, contains recovered fields
 %
 % Revision:
 %   ...
@@ -23,7 +23,7 @@ obs = struct;
 obs.station_long = '';
 obs.startdate = '';
 obs.stationname = '';
-
+obs.coordsyst = '';
 
 % open, read and close file
 if ~isfile(path);   path = [path '/settings_summary.txt'];   end
@@ -44,7 +44,9 @@ end
 bool_station = contains(TXT, 'Station name:');
 if any(bool_station)
     line_station = TXT{bool_station};
-    obs.stationname = line_station(17:20);
+    if length(line_station) >= 20
+        obs.stationname = line_station(17:20);
+    end
 end
 
 % detect long station name
@@ -52,5 +54,14 @@ bool_station_long = contains(TXT, 'Long station name:');
 obs.station_long = obs.stationname;
 if any(bool_station_long)
     line_station = TXT{bool_station_long};
-    obs.station_long = line_station(23:end);   
+    idx = strfind(line_station, ': ');
+    obs.station_long = line_station(idx+2:end);   
 end
+
+% detect coordinate system
+bool_coord_syst = contains(TXT, 'Coordinate System:');
+if any(bool_coord_syst)
+    line_coord_syst = TXT{bool_coord_syst};
+    obs.coordsyst = line_coord_syst(22:end);   
+end
+

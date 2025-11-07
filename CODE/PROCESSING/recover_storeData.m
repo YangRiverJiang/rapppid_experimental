@@ -1,14 +1,15 @@
-function storeData = recover_storeData(folderstring)
+function [storeData, success] = recover_storeData(results_path)
 % This function recovers/rebuilds the variable storeData from the data in
 % the text files of results_float.txt and (potentially) results_fixed.txt
 %
 % INPUT:
-%	folderstring        string, path to results folder of processing
+%	results_path        string, path to results folder of processing
 % OUTPUT:
 %	storeData           struct, contains recovered fields (e.g., position)
-%
+%   success         boolean, true if loading was successful
+% 
 % Revision:
-%   ...
+%   2025/08/07, MFWG: improving function (more generic)
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -16,9 +17,10 @@ function storeData = recover_storeData(folderstring)
 % ||| only the following data is read out from the textfiles:
 %     coordinates, troposphere (estimation)
 
-% ||| DCM:does not work for output files written from decoupled clock model
 
-% initialize
+
+%% initialize
+success = false;
 storeData = struct;
 storeData.float_reset_epochs = 1;
 storeData.gpstime = [];
@@ -48,6 +50,9 @@ storeData.cs_pred_SF = []; storeData.cs_L1C1 = [];
 storeData.cs_dL1dL2 = []; storeData.cs_dL1dL3 = []; storeData.cs_dL2dL3 = [];
 storeData.cs_L1D1_diff	= []; storeData.cs_L2D2_diff = []; storeData.cs_L3D3_diff = [];
 storeData.cs_L1_diff = [];
+storeData.cs_WL_12_diff = []; storeData.cs_var_12 = [];
+storeData.cs_WL_13_diff = []; storeData.cs_var_13 = [];
+storeData.cs_WL_23_diff = []; storeData.cs_var_23 = [];
 storeData.mp_C1_diff_n = []; storeData.mp_C2_diff_n = []; storeData.mp_C3_diff_n = [];
 storeData.constraint = []; storeData.iono_est = [];
 storeData.C1 = []; storeData.C2 = []; storeData.C3 = [];
@@ -56,204 +61,46 @@ storeData.C1_bias = []; storeData.C2_bias = []; storeData.C3_bias = [];
 storeData.L1_bias = []; storeData.L2_bias = []; storeData.L3_bias = [];
 storeData.mp1 = []; storeData.mp2 = []; storeData.MP_c = []; storeData.MP_p = [];
 
+storeData.ORDER_PARAM = {'x'; 'y'; 'z'; 'v_x'; 'v_y'; 'v_z'; 'zwd'};
 
-% open, read and close file
-if ~isfile(folderstring);   folderstring = [folderstring '/settings_summary.txt'];   end
-fid = fopen(folderstring);
-TXT = textscan(fid,'%s', 'delimiter','\n', 'whitespace','');
-TXT = TXT{1};
-fclose(fid);
 
-% detect numer of estimated parameters
-bool_no_param = contains(TXT, 'Number of estimated parameters:');
-if any(bool_no_param)
-    line_param = TXT{bool_no_param};
-    idx = strfind(line_param, '):');
-    storeData.NO_PARAM = str2double(line_param(idx+1:end)); 
+
+%% read settings_summary.txt
+summary_path = results_path;
+if ~isfile(summary_path);   summary_path = [summary_path '/settings_summary.txt'];   end
+
+if isfile(summary_path)
+    % open and read
+    fid = fopen(summary_path);
+    TXT = textscan(fid,'%s', 'delimiter','\n', 'whitespace','');
+    TXT = TXT{1};
+    fclose(fid);
+
+    % detect number of estimated parameters
+    bool_no_param = contains(TXT, 'Number of estimated parameters:');
+    if any(bool_no_param)
+        line_param = TXT{bool_no_param};
+        idx = strfind(line_param, ':');
+        storeData.NO_PARAM = str2double(line_param(idx+1:end));
+    end
 end
 
 
 
-
-
 %% read out results of float solution from results file
-floatpath = [folderstring '/results_float.txt'];
+floatpath = [results_path '/results_float.txt'];
 if isfile(floatpath)
-
-    % --- read header ---
-    fid = fopen(floatpath,'rt');     	% open observation-file
-    header = true;
-    l = 0;
-    while header
-        line = fgetl(fid);              % get next line
-        l = l + 1;
-        
-        % reset epochs
-        if contains(line, '# Reset of float solution in the following epochs:')
-            resets = line(51:end);
-            storeData.float_reset_epochs = str2num(resets);     %#ok<ST2NM>, only str2num works
-        end
-        
-        % end of header
-        if strcmp(line, '#************************************************** ')
-            header = false;
-        end
-        
-        % determine number of columns / data entries in each line
-        if contains(line, '# (')
-            iii = str2double(line(4:5));
-        end
-        
-        
-    end
-    fclose(fid);
-    
-    % --- read out all data
-    fid = fopen(floatpath);
-    D = textscan(fid,'%f','HeaderLines', l+1);  D = D{1};
-    fclose(fid);
-    
-    % --- extract data
-    % create indizes
-    n = numel(D);
-    % ...
-    idx_t = 3:iii:n;                 % GPS time [s]
-    idx_x = 4:iii:n;                 % float xyz coordinates [m]
-    idx_y = 5:iii:n;
-    idx_z = 6:iii:n;
-    % ...
-    idx_geo_lat = 10:iii:n;          % latitude [°]
-    idx_geo_lon = 11:iii:n;          % longitude [°]
-    idx_geo_h = 12:iii:n;            % ellipsoidal height of float position
-    idx_utm_x = 13:iii:n;            % float position in UTM
-    idx_utm_y = 14:iii:n;
-    idx_gps_reclk = 15:iii:n;        % GPS receiver clock error [m]
-    idx_glo_reclk = 16:iii:n;        % GLONASS receiver clock error/offset [m]
-    idx_gal_reclk = 17:iii:n;        % Galileo receiver clock error/offset [m]
-    idx_bds_reclk = 18:iii:n;        % BeiDou receiver clock error/offset [m]    
-    % ...
-    idx_dzwd = 23:iii:n;             % estimated residual zenith wet delay [m]
-    idx_zwd = 24:iii:n;                 % zenith wet delay (a priori + estimation) [m]
-    idx_zhd = 25:iii:n;             	% zenith hydrostatic delay (modeled) [m]
-    idx_G_dcb1 = 26:iii:n;           % GPS DCB between processed f1 and f2 [m]
-    idx_G_dcb2 = 27:iii:n;           % GPS DCB between processed f1 and f3 [m]
-    idx_R_dcb1 = 28:iii:n;           % ...
-    idx_R_dcb2 = 29:iii:n; 
-    idx_E_dcb1 = 30:iii:n;         
-    idx_E_dcb2 = 31:iii:n;         
-    idx_C_dcb1 = 32:iii:n;         
-    idx_C_dcb2 = 33:iii:n; 
-    
-    % ||| continue at some point
-    
-    Z = zeros(numel(idx_x), 1);     % velocity is not extracted
-    
-    
-    % save GPS time
-    storeData.gpstime = D(idx_t);
-    % save float xyz coordinates and estimated residual zwd
-    storeData.param = [D(idx_x), D(idx_y), D(idx_z), ...
-        Z, Z, Z, D(idx_dzwd), ...
-        D(idx_gps_reclk), D(idx_G_dcb1), D(idx_G_dcb2), ...
-        D(idx_glo_reclk), D(idx_R_dcb1), D(idx_R_dcb2), ...
-        D(idx_gal_reclk), D(idx_E_dcb1), D(idx_E_dcb2), ...
-        D(idx_bds_reclk), D(idx_C_dcb1), D(idx_C_dcb2)];
-    % save float UTM coordinates
-    storeData.posFloat_utm = [D(idx_utm_x), D(idx_utm_y), D(idx_geo_h)];
-    % save modeled zhd
-    storeData.zhd = D(idx_zhd);
-    
-    % rebuild and save modeled zwd
-    storeData.zwd = D(idx_zwd) - D(idx_dzwd);
-    
-    % recalculate time to last reset
-    time_resets = storeData.gpstime(storeData.float_reset_epochs);
-    dt_ = storeData.gpstime;
-    r = numel(storeData.float_reset_epochs);            % number of resets
-    for i = r: -1 : 1
-        dt_(dt_ >= time_resets(i)) = dt_(dt_ >= time_resets(i)) - time_resets(i);
-    end
-    storeData.dt_last_reset = dt_;
-    
-    % create storeData.float (epochs with valid float solution)
-    storeData.float = all(~isnan(storeData.param(:,1:3)), 2) & all(storeData.param(:,1:3) ~= 0, 2);
-    
-    
-    % create storeData.obs_interval
-    storeData.obs_interval = mode(diff(storeData.gpstime));
-    
-    
-    % 
-    storeData.posFloat_geo = [D(idx_geo_lat), D(idx_geo_lon), D(idx_geo_h)];
-    
-    
+    storeData = recover_storeData_float(floatpath, storeData);
 end
 
 
 
 %% read out results of fixed solution from textfile
-fixedpath = [folderstring '/results_fixed.txt'];
+fixedpath = [results_path '/results_fixed.txt'];
 if isfile(fixedpath)
-    storeData.fixed_reset_epochs = 1;
-    
-    % --- read header ---
-    fid = fopen(fixedpath,'rt');      	% open observation-file
-    header = true;
-    l = 0;
-    while header
-        line = fgetl(fid);              % get next line
-        l = l + 1;
-        
-        % reset epochs
-        if contains(line, '# Reset of fixed solution in the following epochs:')
-            resets = line(51:end);
-            storeData.fixed_reset_epochs = str2num(resets);     %#ok<ST2NM>, only str2num works
-        end
-        
-        % end of header
-        if strcmp(line, '#************************************************** ')
-            header = false;
-        end
-        
-    end
-    fclose(fid);
-    
-    % --- read out all data
-    fid = fopen(fixedpath);
-    D = textscan(fid,'%f','HeaderLines', l+1);  D = D{1};
-    fclose(fid);
-    
-    % --- extract data
-    % create indizes
-    n = numel(D);
-    % ...
-    idx_t = 3:14:n;                 % GPS time (already saved) [s]
-    idx_x = 4:14:n;                 % fixed xyz coordinates [m]
-    idx_y = 5:14:n;
-    idx_z = 6:14:n;
-    % ...
-    idx_geo_lat = 10:14:n;          % latitude [°]
-    idx_geo_lon = 11:14:n;          % longitude [°]
-    idx_geo_h = 12:14:n;            % ellipsoidal height [m]
-    idx_utm_x = 13:14:n;            % fixed position in UTM [m]
-    idx_utm_y = 14:14:n;
-    % ||| continue at some point
-    
-    % save estimated xyz coordinates
-    storeData.param_fix = [D(idx_x), D(idx_y), D(idx_z)];
-    % save estimated UTM coordinates
-    storeData.posFixed_utm = [D(idx_utm_x), D(idx_utm_y), D(idx_geo_h)];
-    % create storeData.fixed (epochs with valid fixed solution)
-    storeData.fixed = all(~isnan(storeData.param_fix), 2) & all(storeData.param_fix ~= 0, 2);
-    
-    
-    
-    
-    % ||| implement at some point
-    storeData.posFixed_geo = [];
-    
-    
+    storeData = recover_storeData_fixed(fixedpath, storeData);
 end
 
 
+success = true;
 

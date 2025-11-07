@@ -10,7 +10,8 @@ function [IonexFile] = read_ionex_TUW(filename)
 % OUTPUT:
 %   IonexFile       struct, contains data of IONEX file
 % 
-%   Revision:
+% Revision:
+%   2025/08/14, MFWG: switch to cal2gpstime
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -32,7 +33,7 @@ start_epoch(3) = sscanf(ionex{idx}(13:18), '%f');
 start_epoch(4) = sscanf(ionex{idx}(19:24), '%f');
 start_epoch(5) = sscanf(ionex{idx}(25:30), '%f');
 start_epoch(6) = sscanf(ionex{idx}(31:36), '%f');
-[~,start_sow,~] = jd2gps_GT(cal2jd_GT(start_epoch(1), start_epoch(2), start_epoch(3) + start_epoch(4)/24 + start_epoch(5)/1440 + start_epoch(6)/86400));
+[~, start_sow] = cal2gpstime(start_epoch);
 idx = contains(ionex,'EPOCH OF LAST MAP');
 end_epoch(1)   = sscanf(ionex{idx}(1:6), '%f');
 end_epoch(2)   = sscanf(ionex{idx}(7:12), '%f');
@@ -40,7 +41,9 @@ end_epoch(3)   = sscanf(ionex{idx}(13:18), '%f');
 end_epoch(4)   = sscanf(ionex{idx}(19:24), '%f');
 end_epoch(5)   = sscanf(ionex{idx}(25:30), '%f');
 end_epoch(6)   = sscanf(ionex{idx}(31:36), '%f');
-[~,end_sow,~]  = jd2gps_GT(cal2jd_GT(end_epoch(1), end_epoch(2), end_epoch(3) + end_epoch(4)/24 + end_epoch(5)/1440 + end_epoch(6)/86400));
+[~, end_sow] = cal2gpstime(end_epoch);
+
+
 if end_sow == 0 && end_sow < start_sow
     % set saved 'end of ionex file' to the last second of the GPS week to 
 	% avoid errors later on (e.g., in iono_gims.m)

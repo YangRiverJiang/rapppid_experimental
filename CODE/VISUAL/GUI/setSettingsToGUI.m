@@ -701,12 +701,26 @@ set(handles.edit_cs_td_thresh, 'String', num2str(structure.OTHER.CS.TD_threshold
 set(handles.edit_cs_td_degree, 'String', num2str(structure.OTHER.CS.TD_degree));
 end
 
+% cycle-slip detection HMW LC
+try
+set(handles.checkbox_cs_HMW, 'Value', structure.OTHER.CS.HMW); 
+set(handles.edit_cs_HMW_thresh, 'String', num2str(structure.OTHER.CS.HMW_threshold));
+set(handles.edit_cs_HMW_factor, 'String', num2str(structure.OTHER.CS.HMW_factor));
+end
+
 % multipath detection
 try
 set(handles.checkbox_mp_detection, 'Value', structure.OTHER.mp_detection);
 set(handles.edit_mp_degree, 'String', num2str((structure.OTHER.mp_degree)));
 set(handles.edit_mp_thresh, 'String', num2str(structure.OTHER.mp_thresh ));
 set(handles.edit_mp_cooldown, 'String', num2str(structure.OTHER.mp_cooldown));         
+end
+
+% Loss of Lock Index ||| delete try/catch at some later point
+try
+    handles.checkbox_LLI.Value = structure.PROC.LLI;
+catch
+    handles.checkbox_LLI.Value = 1;     % old default settings
 end
 
 
@@ -788,11 +802,27 @@ set(handles.popupmenu_filter, 'Value', value);
 
 % Satellite
 try
-    set(handles.checkbox_satellite, 'Value', structure.ADJ.satellite.bool );
+    set(handles.checkbox_satellite, 'Value', structure.ADJ.satellite.bool);
     set(handles.edit_sat_mass, 'String', num2str(structure.ADJ.satellite.mass));
     set(handles.edit_sat_area, 'String', num2str(structure.ADJ.satellite.area));
     set(handles.edit_sat_drag, 'String', num2str(structure.ADJ.satellite.drag));
     set(handles.edit_sat_solar, 'String', num2str(structure.ADJ.satellite.solar));
+    set(handles.edit_sat_id,    'String', num2str(structure.ADJ.satellite.ID));
+
+    try
+        switch structure.ADJ.satellite.orient_mode
+            case 'Yaw-Steering'
+                handles.radiobutton_or_yaw.Value = 1;
+            case 'Earth-Pointing'
+                handles.radiobutton_or_earth.Value = 1;
+            case 'ORBEX'
+                handles.radiobutton_or_orbex.Value = 1;
+        end
+    end
+
+
+
+
 catch
     set(handles.checkbox_satellite, 'Value', 0 );
 end
@@ -804,6 +834,9 @@ end
 set(handles.radiobutton_MPLC_Dependency,            'Value', structure.ADJ.weight_mplc );
 set(handles.radiobutton_Elevation_Dependency,       'Value', structure.ADJ.weight_elev );
 try     % write elevation weighting function to text-field
+    try
+        set(handles.edit_elevation_weighting_function,  'String', structure.ADJ.elev_weight_fun);
+    end    
     set(handles.edit_elevation_weighting_function,  'String', strrep(func2str(structure.ADJ.elev_weight_fun), '@(e)', ''));
 end
 set(handles.radiobutton_Signal_Strength_Dependency, 'Value', structure.ADJ.weight_sign_str );
@@ -812,6 +845,9 @@ try     % write C/N0 weighting function to text-field
         set(handles.edit_snr_weighting_function,  'String', structure.ADJ.snr_weight_fun);
     end
     set(handles.edit_snr_weighting_function,  'String', strrep(func2str(structure.ADJ.snr_weight_fun), '@(snr)', ''));
+end
+try
+    set(handles.radiobutton_Bore_Dependency,          'Value', structure.ADJ.weight_bore );
 end
 try
     set(handles.radiobutton_No_Dependency,          'Value', structure.ADJ.weight_none );
@@ -887,12 +923,6 @@ catch
     handles.checkbox_AdjustPhase.Value = 0;
 end
 
-% Loss of Lock Index ||| delete try/catch at some later point
-try
-    handles.checkbox_LLI.Value = structure.PROC.LLI;
-catch
-    handles.checkbox_LLI.Value = 1;     % old default settings
-end
 % check of observed minus computed
 try
     set(handles.edit_omc_thresh_c, 'String', num2str(structure.PROC.omc_code_thresh));
@@ -961,18 +991,30 @@ end
 try         % ||| remove at some point
     % output
     handles.checkbox_exp_data4plot.Value         = structure.EXP.data4plot;
-    handles.checkbox_exp_results_float.Value     = structure.EXP.results_float;
+	try
+		handles.checkbox_exp_results_txt.Value     = structure.EXP.results_txt;
+	catch
+		handles.checkbox_exp_results_txt.Value     = structure.EXP.results_float;
+	end
+	try
+		handles.checkbox_exp_results_csv.Value     = structure.EXP.results_csv;
+	catch
+		handles.checkbox_exp_results_csv.Value     = 0;
+    end
+
     try
         handles.edit_exp_digits_time.String      = structure.EXP.epoch_decimals;
     catch
         handles.edit_exp_digits_time.String  	 = '1';
     end
-    handles.checkbox_exp_results_fixed.Value     = structure.EXP.results_fixed;
     handles.checkbox_exp_settings.Value          = structure.EXP.settings;
     handles.checkbox_exp_settings_summary.Value  = structure.EXP.settings_summary;
     handles.checkbox_exp_model_save.Value        = structure.EXP.model_save;
     try
         handles.checkbox_exp_tropo_zpd.Value         = structure.EXP.tropo_est;
+    end
+    try
+        handles.checkbox_exp_sp3.Value = structure.EXP.sp3;
     end
     % Variable obs
     handles.checkbox_exp_obs_bias.Value          = structure.EXP.obs_bias;

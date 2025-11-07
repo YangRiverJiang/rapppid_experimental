@@ -25,47 +25,31 @@ reset_sow = storeData.gpstime(storeData.float_reset_epochs);
 
 duration = storeData.gpstime(end) - storeData.gpstime(1);     % total time of processing [sec]
 duration = duration/3600;                               % ... [h]
-% determine labelling of x-axis
-if duration < 0.5   % less than 1/2 hour
-    vec = 0:300:86400;          % 5min-intervall
-elseif duration < 1
-    vec = 0:(3600/4):86400;     % 15min-intervall
-elseif duration < 2
-    vec = 0:(3600/2):86400;     % 30min-intervall
-elseif duration < 4
-    vec = 0:3600:86400;         % 1-h-intervall
-elseif duration < 9
-    vec = 0:(3600*2):86400;   	% 2-h-intervall
-else
-    vec = 0:(3600*4):86400;    	% 4-h-intervall
-end
-ticks = sow2hhmm(vec);
+
+% create ticks
+[vec, ticks] = duration2ticks(duration);
+vec = storeData.gpstime(1) + vec;
 
 % Plot the Detection of Cycle-Slips with Single-Frequency-Data
-plotit(mod(storeData.gpstime,86400), full(storeData.cs_L1_diff), thresh, sys, vec, ticks, mod(reset_sow,86400), degree)
+plotit(storeData.gpstime, full(storeData.cs_L1_diff), thresh, sys, vec, ticks, mod(reset_sow,86400), degree)
 
 
 
 function [] = plotit(x, L1_diff, thresh, sys, vec, ticks, resets, degree)
 if sys == 'G'           % GPS
     loop1 =  1:16;
-    loop2 = 17:32;
     col = DEF.COLOR_G;
 elseif sys == 'R'       % GLONASS
     loop1 = 101:116;
-    loop2 = 117:132;
     col = DEF.COLOR_R;
 elseif sys == 'E'      	% Galileo
     loop1 = 201:216;
-    loop2 = 217:232;
     col = DEF.COLOR_E;
 elseif sys == 'C'      	% BeiDou
     loop1 = 301:316;
-    loop2 = 317:332;
     col = DEF.COLOR_C;
 elseif sys == 'J'      	% QZSS
     loop1 = 401:407;
-    loop2 = [];
     col = DEF.COLOR_J;    
 end
 
@@ -102,12 +86,11 @@ for i = loop1           % loop over satellites
         hline(-thresh, 'g-')        % plot negative threshold
         cs_idx = (abs(y) > thresh); % indices where cycle-slip is detected
         x_cs = x(cs_idx); y_cs = y(cs_idx);     % get x,y of cycle slips
-        plot(x_cs,  y_cs,  'ro')       % plot cycle-slips
+        plot(x_cs,  y_cs,  'ko')       % plot cycle-slips
         % find those CS which are outside zoom
         idx = abs(y_cs) > 2*thresh;
         y = 2*thresh*idx;
-        plot(x_cs(idx),  y(y~=0),  'mo', 'MarkerSize',8)        % highlight CS outside of zoom window
-        if ~isempty(resets); vline(resets, 'k:'); end	% plot vertical lines for resets
+        plot(x_cs(idx),  y(y~=0),  'ro', 'MarkerSize',8)        % highlight CS outside of zoom window
         % Styling
         Grid_Xoff_Yon()
         set(gca, 'XTick',vec, 'XTickLabel',ticks)

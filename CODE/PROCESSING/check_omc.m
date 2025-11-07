@@ -15,6 +15,9 @@ function [Epoch, Adjust] = check_omc(Epoch, model, Adjust, settings, obs_intval)
 % OUTPUT:
 %   Epoch       struct, updated fields: exclude and cs_found
 %   Adjust      struct, variables for adjustment/filtering
+%
+% Revision:
+%   2025/11/06, MFWG: only check omc with ionospheric delay estimation
 % 
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -24,7 +27,7 @@ function [Epoch, Adjust] = check_omc(Epoch, model, Adjust, settings, obs_intval)
 thresh_c = settings.PROC.omc_code_thresh;       % [m]
 thresh_p = settings.PROC.omc_phase_thresh;      % [m]  
 fac = settings.PROC.omc_factor;                 % []
-n   = settings.PROC.omc_window;                 % [epochs]
+w   = settings.PROC.omc_window;                 % [epochs]
 
 % get some variables
 obs_code  = Epoch.code;
@@ -40,12 +43,22 @@ no_sats = numel(Epoch.sats);                 	% number of satellites
 no_obs  = settings.INPUT.proc_freqs*no_sats;   	% number of observations in current epoch
 no_frqs = settings.INPUT.proc_freqs;            % number of processed frequencies
 
+% only check omc of satellites with ionospheric delay estimation
+bool_iono = true(size(Epoch.exclude));
+if contains(settings.IONO.model, 'Estimate')
+    n = numel(Adjust.param);
+    idx = (n-no_sats+1):n;
+    iono = Adjust.param(idx);   % estimated ionospheric delay on 1st frequency
+    bool_iono(iono == 0, :) = false;
+end
+
+
 
 
 %% CODE
 % calculate threshold for observed minus computed check of code observations
-if time_last_reset/obs_intval >= n
-    omc_old = Adjust.code_omc(1:n-1, Epoch.sats);   % do not take current epoch
+if time_last_reset/obs_intval >= w
+    omc_old = Adjust.code_omc(1:w-1, Epoch.sats);   % do not take current epoch
     std_thresh = fac * std(omc_old(:), 'omitnan');
     thresh_c = min([std_thresh thresh_c]);
 end
@@ -70,8 +83,10 @@ if sum( omc_code_(:) > thresh_c | isnan(omc_code_(:)) )   >   0.5 * no_obs
     return
 end
 
-% check for code outliers which are not already under cutoff
-outlier_c = (omc_code_ > thresh_c) & ~exclude;
+% detect outliers of code observations, which 
+% - are not already excluded 
+% - have ionospheric delay estimation
+outlier_c = (omc_code_ > thresh_c) & ~exclude & bool_iono;
 exclude(outlier_c) = true;
 
 % print detected outliers
@@ -117,16 +132,22 @@ if bool_phase
     omc_phase_(Epoch.bds,:) = abs(omc_phase(Epoch.bds,:) - median(omc_phase(Epoch.bds,:), 'omitnan'));
     
     % calculate threshold for observed minus computed check of phase observations
-    if time_last_reset/obs_intval >= n
-        omc_old = Adjust.phase_omc(1:n-1, Epoch.sats);      % do not take current epoch
+    if time_last_reset/obs_intval >= w
+        omc_old = Adjust.phase_omc(1:w-1, Epoch.sats);      % do not take current epoch
         std_thresh = fac * std(omc_old(:), 'omitnan');
         thresh_p = min([std_thresh thresh_p]);
     end    
-    
-    % check for phase outliers which are not under cutoff angle
+
+    % check which ambiguities already have an estimation
     N = reshape(Adjust.param(N_idx), no_sats, no_frqs); 	
-    bool_N = N ~=0 & ~isnan(N);         % ambiguity is currently estimated
-    outlier_p = (omc_phase_ > thresh_p) & bool_N & ~exclude & ~cs_found;
+    bool_N = N ~=0 & ~isnan(N);         % ambiguity is currently estimated    
+
+    % detect for outliers of phase observations, which 
+    % - are not excluded
+    % - have an estimated ambiguity
+    % - are cycle-slip free
+    % - have ionospheric delay estimation
+    outlier_p = (omc_phase_ > thresh_p) & ~exclude & bool_N & ~cs_found & bool_iono;
     cs_found(outlier_p) = true;
     
     % print detected outliers
@@ -151,6 +172,8 @@ if bool_phase
     Epoch.sat_status(outlier_p) = 11;       % set satellite status
 
 end
+
+
 
 
 %% save results to Epoch

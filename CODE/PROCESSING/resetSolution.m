@@ -1,25 +1,22 @@
-function [Adjust, Epoch, settings, HMW_12, HMW_23, HMW_13, storeData, init_ambiguities] = ...
-    resetSolution(Adjust, Epoch, settings, HMW_12, HMW_23, HMW_13, storeData, obs_int, init_ambiguities)
+function [Adjust, Epoch, settings, storeData, init_ambiguities] = ...
+    resetSolution(Adjust, Epoch, settings, storeData, init_ambiguities)
 % function to reset the float and fixed solution to start a new convergence
 % of the (coordinate) solution. Be careful: at this point of the loop /
 % epoch-wise processing Epoch contains the epoch-specific data from the
 % last epoch.
 %
 % INPUT:
-%   Adjust
-%   Epoch
-%   settings
-%   HMW_12, HMW_23, HMW_13
-%   storeData
-%   obs_int
-%   bool_float      true if float solution shall be resetted
-%   bool_fixed      true if fixed solution shall be resetted
+%   Adjust              struct, variables relevant for parameter estimation
+%   Epoch               struct, epoch-specific variables
+%   settings            struct, processing settings (from GUI)
+%   storeData           struct, stores data of whole processing
+%   init_ambiguities    matrix, values for shifting phase to code
 % OUTPUT:
-%   Adjust
-%   Epoch
-%   settings
-%   HMW_12, HMW_23, HMW_13
-%   storeData
+%   Adjust              struct, variables relevant for parameter estimation
+%   Epoch               struct, epoch-specific variables
+%   settings            struct, processing settings (from GUI)
+%   storeData           struct, stores data of whole processing
+%   init_ambiguities    matrix, values for shifting phase to code
 % 
 % Revision:
 %   ...
@@ -64,6 +61,8 @@ end
 
 %% reset solution
 if resetnow
+
+    nnn = DEF.SATS;
     if ~settings.INPUT.bool_parfor
         fprintf('Epoch %d: RESET of solution            \n\n', q)
     end
@@ -79,14 +78,11 @@ if resetnow
     if bool_fixed && settings.AMBFIX.bool_AMBFIX
         Adjust.fixed = false;
         Adjust.fixed_reset_epochs = [Adjust.fixed_reset_epochs, q];
-        Adjust.reset_time = Epoch.gps_time;
-        % restart fixing in [GUI-definded] epochs
-        settings.AMBFIX.start_fixing(end+1, :) = ...    % -1 as we are already in epoch where reset is happening
-            [q+settings.AMBFIX.start_WL-1, q+settings.AMBFIX.start_NL-1];   
+        Adjust.reset_time = Epoch.gps_time; 
         % reset Melboure-Wübbena LCs (ATTENTION: values of MW are overwritten!)
-        HMW_12(1:q,:) = 0;
-        HMW_23(1:q,:) = 0;
-        HMW_13(1:q,:) = 0;
+        Adjust.HMW_12(1:q,:) = 0;
+        Adjust.HMW_23(1:q,:) = 0;
+        Adjust.HMW_13(1:q,:) = 0;
         % create new entry in time to first fix
         storeData.ttff(end+1) = NaN;
     end
@@ -97,11 +93,17 @@ if resetnow
     Epoch.tracked(:) = 0;           % reset number of epochs each satellite is tracked
     
     % reset collected data of cycle slip detection
-    if settings.OTHER.CS.l1c1
+    if settings.OTHER.CS.l1c1               % code minus phase
         Epoch.cs_L1C1(:,:) = NaN;
     end
-    if settings.OTHER.CS.TimeDifference
+    if settings.OTHER.CS.TimeDifference     % time difference
         Epoch.cs_phase_obs(:,:) = NaN;
+        Epoch.cs_time_obs(:,:) = NaN;
+    end
+    if settings.OTHER.CS.HMW
+        Epoch.cs_HMW_k = zeros(3,nnn);		% HMW LC
+        Epoch.cs_HMW_av = zeros(3,nnn);
+        Epoch.cs_HMW_var = zeros(3,nnn);
     end
     
     % reset collected data of multipath detection
@@ -118,13 +120,13 @@ if resetnow
     
     % reset initialization of ambiguities (otherwise the reset would not be
     % a total restart of the processing)
-    init_ambiguities = NaN(3, 410);
+    init_ambiguities = NaN(3, nnn);
     
     % reset broadcast column
-    Epoch.BRDCcolumn = NaN(410,1);
+    Epoch.BRDCcolumn = NaN(nnn,1);
     
     % corrections from real-time correction stream
-    Epoch.corr2brdc_orb = zeros(8,410);		% timestamp, radial, along, outof, v_radial, v_along, v_outof, IOD
-    Epoch.corr2brdc_clk = zeros(5,410);		% timestamp, a0, a1, a2, IOD
+    Epoch.corr2brdc_orb = zeros(8,nnn);		% timestamp, radial, along, outof, v_radial, v_along, v_outof, IOD
+    Epoch.corr2brdc_clk = zeros(5,nnn);		% timestamp, a0, a1, a2, IOD
     
 end

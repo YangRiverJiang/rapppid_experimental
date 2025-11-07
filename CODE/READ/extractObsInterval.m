@@ -9,6 +9,7 @@ function [obs_intv] = extractObsInterval(path_file)
 %
 % Revision:
 %  	2025/02/18, MFWG: round interval to 3 fractional digits
+%   2025/08/14, MFWG: switch to cal2gpstime
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -37,12 +38,10 @@ end
 while 1
     line = fgetl(fid);          % get next line
     if version == 2 && contains(line, epochheader_v2)
-        linvalues = textscan(line,'%f %f %f %f %f %f %d %2d%s','delimiter',',');
+        lvalues = textscan(line,'%f %f %f %f %f %f %d %2d%s','delimiter',',');
         epochheader_v2 = line(1:12);
         % convert date into gps-time [sow]
-        h = linvalues{4} + linvalues{5}/60 + linvalues{6}/3600;             % fractional hour
-        jd = cal2jd_GT(2000+linvalues{1}, linvalues{2}, linvalues{3} + h/24); % julian date
-        [~, gps_time, ~] = jd2gps_GT(jd);                                      % gps-time [sow]
+        [~, gps_time] = cal2gpstime([lvalues{1}, lvalues{2}, lvalues{3}, lvalues{4}, lvalues{5}, lvalues{6}]);
         % save and calculate observation interval
         if isempty(gps_time_1)
             gps_time_1 = gps_time;
@@ -54,11 +53,9 @@ while 1
     end
     
     if version >= 3 && contains(line, '> ')
-        linvalues = textscan(line,'%*c %f %f %f %f %f %f %d %2d %f');
+        lvalues = textscan(line,'%*c %f %f %f %f %f %f %d %2d %f');
         % convert date into gps-time [sow]
-        h = linvalues{4} + linvalues{5}/60 + linvalues{6}/3600;         % fractional hour
-        jd = cal2jd_GT(linvalues{1}, linvalues{2}, linvalues{3} + h/24);   % Julian date
-        [~, gps_time,~] = jd2gps_GT(jd);                                   % gps-time [sow]
+        [~, gps_time] = cal2gpstime([lvalues{1}, lvalues{2}, lvalues{3}, lvalues{4}, lvalues{5}, lvalues{6}]);
         % save and calculate observation interval
         if isempty(gps_time_1)
             gps_time_1 = gps_time;

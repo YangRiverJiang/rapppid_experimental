@@ -1,5 +1,4 @@
-function [PR] = generateCodePseudorange(gnssRaw, leap_seconds, ...
-    GPS_L1, GPS_L5, GLO_G1, GAL_E1, GAL_E5a, BDS_B1, BDS_B2a, QZS_L1, QZS_L5)
+function [PR] = generateCodePseudorange(gnssRaw, leap_seconds)
 % This function generates the code pseudorange observation for the current 
 % epoch from the sensor data Android devices provide based on approach 1 
 % (2.4.2.1) described in https://data.europa.eu/doi/10.2878/449581
@@ -12,14 +11,14 @@ function [PR] = generateCodePseudorange(gnssRaw, leap_seconds, ...
 % INPUT:
 %   gnssRaw         struct, contains raw GNSS data of current epoch
 %   leap_sec        [s], number of leap seconds between UTC and GPST
-%   GPS_L1, GPS_L5, GLO_G1, GAL_E1, ...
-%                   boolean vectors indicating origin of measurement
+% 
 % OUTPUT:
 %	PR              code pseudorange for all satellites [m]
 %
 % Revision:
 %   2024/01/08, MFWG: improving PR generation, adding BDS B2a and QZSS
 %   2024/01/16, MFWG: repairing GPS week rollover 
+%   2025/08/12, MFWG: moving detection of frequency into the function
 %
 % This function belongs to raPPPid, Copyright (c) 2023, M.F. Glaner
 % *************************************************************************
@@ -42,6 +41,18 @@ PseudorangeRateUncertaintyMetersPerSecond = gnssRaw.PseudorangeRateUncertaintyMe
 ConstellationType   = gnssRaw.ConstellationType;
 State               = gnssRaw.State;
 
+% detect the origin of the measurement (GNSS and frequency) using approximate frequency
+% boolean vectors indicating origin of measurement (GNSS + Frequency)
+GPS_L1 = (gnssRaw.ConstellationType == 1) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GPS_F1 /1e4));
+GPS_L5 = (gnssRaw.ConstellationType == 1) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GPS_F5 /1e4));
+GLO_G1 = (gnssRaw.ConstellationType == 3) & (round(gnssRaw.CarrierFrequencyHz/1e7) == round(Const.GLO_F1 /1e7));
+GAL_E1 = (gnssRaw.ConstellationType == 6) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GAL_F1 /1e4));
+GAL_E5a= (gnssRaw.ConstellationType == 6) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.GAL_F5a/1e4));
+BDS_B1 = (gnssRaw.ConstellationType == 5) & (round(gnssRaw.CarrierFrequencyHz/1e3) == round(Const.BDS_F1 /1e3));
+BDS_B2a= (gnssRaw.ConstellationType == 5) & (round(gnssRaw.CarrierFrequencyHz/1e3) == round(Const.BDS_F2a/1e3));
+QZS_L1 = (gnssRaw.ConstellationType == 4) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.QZSS_F1/1e4));
+QZS_L5 = (gnssRaw.ConstellationType == 4) & (round(gnssRaw.CarrierFrequencyHz/1e4) == round(Const.QZSS_F5/1e4));
+
 % check State
 CODE_LOCK             = bitand(State, 2^0);
 TOW_DECODED           = bitand(State, 2^3);
@@ -49,7 +60,7 @@ GLO_STRING_SYNC       = bitand(State, 2^6);
 GLO_TOD_DECODED       = bitand(State, 2^7);
 GAL_E1BC_CODE_LOCK    = bitand(State, 2^10);
 GAL_E1C_2ND_CODE_LOCK = bitand(State, 2^11);
-GAL_E1B_PAGE_SYNC     = bitand(State, 2^12);
+% GAL_E1B_PAGE_SYNC     = bitand(State, 2^12);
 TOW_KNOWN             = bitand(State, 2^14);
 
 

@@ -28,10 +28,10 @@ if X == 0 || Y == 0 || Z == 0 || isnan(X) || isnan(Y) || isnan(Z)
     return
 end
 
-try        % requires Mapping ToolBox
+if exist('ecef2geodetic', 'file')       % requires Mapping ToolBox
     [x.lat, x.lon, x.h] = ecef2geodetic(wgs84Ellipsoid, X, Y,Z, 'radians');
     
-catch
+else
     % old version (own implementation), ecef2geodetic might be more precise
     a = Const.WGS84_A;
     b = Const.WGS84_B;

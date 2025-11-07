@@ -69,7 +69,8 @@ ind_qzss_freq = [0 0 0];
 % detect RINEX version
 version_full = line(6:9);
 version_full = sscanf(version_full, '%f');
-if ~contains(upper(line), 'OBSERVATION')   	% check if this RINEX File contains observation data
+ % check if this RINEX File contains observation data
+if ~contains(upper(line), 'OBSERVATION') && ~contains(upper(line), ' O ')
     [~, obs_filename, ext] = fileparts(file);
     errordlg({[obs_filename ext ':'], 'Is not recognized as Rinex Observation File.'}, 'Wrong File-Format');
     ind_gps_freq = [];
