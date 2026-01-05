@@ -24,3 +24,8 @@ if settings.INPUT.use_GAL
     input.ORBCLK.preciseClk_GAL.t  = input.ORBCLK.preciseEph_GAL.t(:,1);
     input.ORBCLK.preciseClk_GAL.dT = input.ORBCLK.preciseEph_GAL.dT;
 end
+if settings.INPUT.use_BDS
+    input.ORBCLK.preciseClk_BDS.t  = input.ORBCLK.preciseEph_BDS.t(:,1);
+    input.ORBCLK.preciseClk_BDS.dT = input.ORBCLK.preciseEph_BDS.dT;
+end
+

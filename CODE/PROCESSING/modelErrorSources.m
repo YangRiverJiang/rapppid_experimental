@@ -270,6 +270,8 @@ for i_sat = 1:num_sat
         status(:) = 5;
         Epoch.tracked(prn) = 1;             % set epoch counter for this satellite to 1
     end
+    
+    orb_solved = false;
 
     for step = 1:2   % Iteration to estimate relativistic effect and interpolate satellite position
         dT_sat_rel = dT_sat + dT_rel;
@@ -281,8 +283,18 @@ for i_sat = 1:num_sat
         % --- Satellite-Orbit: precise ephemeris (.sp3-file) or broadcast navigation data (perhaps + correction stream) ---
         if settings.ORBCLK.bool_sp3
             [X, V, ~, exclude, status] = satelliteOrbit(prn, Ttr, preciseEph, settings, exclude, status);
+            if(isnan(X(1)))
+                break;
+            else
+                orb_solved = true;
+            end
         else
             [X, V, ~, exclude, status] = satelliteOrbitBrdc(Ttr, Eph_brdc, isGPS, isGLO, isGAL, isBDS, isQZSS, k, settings.ORBCLK.corr2brdc_orb, exclude, status, Epoch.corr2brdc_orb(:,prn));
+            if(isnan(X(1)))
+                break;
+            else
+                orb_solved = true;
+            end
         end
 
         % --- correction of satellite ECEF position for earth rotation during runtime tau ---
@@ -301,7 +313,14 @@ for i_sat = 1:num_sat
         end
     end % end of for step = 1:2 - Iteration to estimate relativistic effect and interpolate satellite position
 
-
+    if(~orb_solved)
+        Epoch.exclude(i_sat,frqs) = true; 	% eliminate satellite
+        Epoch.sat_status(i_sat) = 15;
+        Epoch.tracked(prn) = 1;
+        model.Rot_X(:,i_sat) = [0; 0; 0];
+        model.el(i_sat,frqs) = 0;
+        continue;
+    end
 
     %% Vectors, Angles, Distance between Receiver and Satellite
 
